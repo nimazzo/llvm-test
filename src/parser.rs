@@ -80,7 +80,7 @@ impl Parser {
         // todo: parse arguments
         parse!(self, TokenType::LeftParen)?;
         parse!(self, TokenType::RightParen)?;
-        Ok(PrototypeAST::new(function_name, vec![], false))
+        Ok(PrototypeAST::new(function_name, vec![]))
     }
 
     fn parse_function_body(&mut self) -> Result<ExprAST> {
@@ -94,7 +94,7 @@ impl Parser {
     fn parse_top_level_expression(&mut self) -> Result<FunctionAST> {
         let body = self.parse_expression()?;
         parse!(self, TokenType::Semicolon)?;
-        let proto = PrototypeAST::new(ANONYMOUS_FUNCTION_NAME.into(), vec![], true);
+        let proto = PrototypeAST::new(ANONYMOUS_FUNCTION_NAME.into(), vec![]);
         Ok(FunctionAST::new(proto, body))
     }
 

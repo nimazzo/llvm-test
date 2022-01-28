@@ -32,12 +32,11 @@ impl Debug for ASTPrimitive {
 pub struct PrototypeAST {
     pub name: String,
     pub args: Vec<String>,
-    pub anon: bool,
 }
 
 impl PrototypeAST {
-    pub fn new(name: String, args: Vec<String>, anon: bool) -> Self {
-        Self { name, args, anon }
+    pub fn new(name: String, args: Vec<String>) -> Self {
+        Self { name, args }
     }
 }
 
