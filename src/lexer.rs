@@ -60,30 +60,58 @@ impl Lexer {
 
     /*========== Private Functions ==========*/
     fn get_token_pos(&self) -> (usize, usize) {
-        let token_len = self.idx - self.idx_token_start;
-        (self.row, self.col - token_len)
+        // let token_len = self.idx - self.idx_token_start;
+        // (self.row, self.col - token_len)
+        (self.row, self.col)
     }
 
     fn identify_token(&mut self) -> Token {
         self.skip_whitespace_and_comments();
 
+        let pos = self.get_token_pos();
         if self.has_more_tokens() {
             let start = self.get_current_char();
             self.idx_token_start = self.idx;
 
-            if start.is_ascii_digit() {
+            match start {
+                '(' => {
+                    self.advance_index();
+                    return Token::new(pos, TokenType::LeftParen)
+                },
+                ')' => {
+                    self.advance_index();
+                    return Token::new(pos, TokenType::RightParen)
+                },
+                '{' => {
+                    self.advance_index();
+                    return Token::new(pos, TokenType::LeftCurly)
+                },
+                '}' => {
+                    self.advance_index();
+                    return Token::new(pos, TokenType::RightCurly)
+                },
+                _ => (),
+            }
+
+            return if start.is_ascii_alphabetic() {
+                let identifier = self.parse_identifier();
+                match identifier.as_str() {
+                    "fn" => Token::new(pos, TokenType::Fn),
+                    _ => Token::new(pos, TokenType::Identifier(identifier)),
+                }
+            } else if start.is_ascii_digit() {
                 let number = self.parse_number();
-                return Token::new(self.get_token_pos(), TokenType::Number(number));
+                Token::new(pos, TokenType::Number(number))
             } else if start == '+' {
                 self.advance_index();
-                return Token::new(self.get_token_pos(), TokenType::Plus);
+                Token::new(pos, TokenType::Plus)
             } else {
                 self.advance_index();
-                return Token::new(self.get_token_pos(), TokenType::Other(start));
+                Token::new(pos, TokenType::Other(start))
             }
         }
 
-        Token::new(self.get_token_pos(), TokenType::Eof)
+        Token::new(pos, TokenType::Eof)
     }
 
     fn parse_number(&mut self) -> i64 {
@@ -98,6 +126,20 @@ impl Lexer {
             }
         }
         number.parse().expect("number must be an integer")
+    }
+
+    fn parse_identifier(&mut self) -> String {
+        let mut identifier = String::new();
+        while self.has_more_tokens() {
+            let c = self.get_current_char();
+            if c.is_ascii_alphabetic() {
+                identifier.push(c);
+                self.advance_index();
+            } else {
+                break;
+            }
+        }
+        identifier
     }
 
     fn skip_whitespace_and_comments(&mut self) {

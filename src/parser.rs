@@ -58,7 +58,7 @@ impl Parser {
     }
 
     fn curr_token_type(&self) -> TokenType {
-        self.current_token.token_type
+        self.current_token.token_type.clone()
     }
 
     fn parse_top_level_expression(&mut self) -> Result<FunctionAST> {
@@ -108,7 +108,7 @@ impl Parser {
     fn parse_binop_rhs(&mut self, expr_prec: i32, mut lhs: ExprAST) -> Result<ExprAST> {
         // if this is a binary operation, find its precedence
         loop {
-            let token_prec = token::get_token_precedence(self.current_token);
+            let token_prec = token::get_token_precedence(&self.current_token);
 
             // If this is a binop that binds at least as tightly as the current binop,
             // consume it, otherwise we are done.
@@ -133,7 +133,7 @@ impl Parser {
             // Parse the primary expression after the binary operator.
             let mut rhs = self.parse_primary()?;
 
-            let next_prec = token::get_token_precedence(self.current_token);
+            let next_prec = token::get_token_precedence(&self.current_token);
             if token_prec < next_prec {
                 rhs = self.parse_binop_rhs(token_prec + 1, rhs)?;
             }
