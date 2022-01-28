@@ -18,12 +18,10 @@ mod token;
 fn main() -> Result<(), Box<dyn Error>> {
     let input = include_str!("../sources/simple.txt");
 
-    let mut lexer = Lexer::new(input);
-    for token in lexer.tokens() {
-    }
-
-    // let mut parser = Parser::new(lexer);
-    // let ast = parser.parse().expect("failed to parse");
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
+    let ast = parser.parse().expect("failed to parse");
+    println!("{:#?}", ast);
     // let mut compiler = Compiler::new()?;
     // let program = compiler.compile(&ast)?;
     //

@@ -8,11 +8,11 @@ use anyhow::Result;
 const ANONYMOUS_FUNCTION_NAME: &str = "anonymous";
 
 macro_rules! parse {
-    ($self: ident, $tk: literal) => {{
+    ($self: ident, $tk: path) => {{
         match $self.curr_token_type() {
-            TokenType::Other($tk) => {
-                $self.advance_token();
-                Ok(1)
+            $tk => {
+                let token = $self.advance_token();
+                Ok(token)
             },
             _ => Err(
                 ParseError::missing_token($self.lexer.get_context(), &format!("{}", $tk))
@@ -40,12 +40,16 @@ impl Parser {
         let mut program = vec![];
         loop {
             match self.curr_token_type() {
+                TokenType::Fn => {
+                    let fun = self.parse_function()?;
+                    program.push(ASTPrimitive::FunctionAST(fun));
+                }
                 TokenType::Eof => {
                     break;
                 }
                 _ => {
-                    let expr = self.parse_top_level_expression()?;
-                    program.push(ASTPrimitive::FunctionAST(expr));
+                    let fun = self.parse_top_level_expression()?;
+                    program.push(ASTPrimitive::FunctionAST(fun));
                 }
             }
         }
@@ -53,17 +57,43 @@ impl Parser {
     }
 
     /*========== Private Functions ==========*/
-    fn advance_token(&mut self) {
+    fn advance_token(&mut self) -> Token {
+        let current_token = self.current_token.clone();
         self.current_token = self.lexer.next_token();
+        current_token
     }
 
     fn curr_token_type(&self) -> TokenType {
         self.current_token.token_type.clone()
     }
 
+    fn parse_function(&mut self) -> Result<FunctionAST> {
+        let proto = self.parse_function_prototype()?;
+        let body = self.parse_function_body()?;
+        Ok(FunctionAST::new(proto, body))
+    }
+
+    fn parse_function_prototype(&mut self) -> Result<PrototypeAST> {
+        parse!(self, TokenType::Fn)?;
+        let function_name = self.get_identifier_token()?;
+        self.advance_token(); // eat fn identifier
+        // todo: parse arguments
+        parse!(self, TokenType::LeftParen)?;
+        parse!(self, TokenType::RightParen)?;
+        Ok(PrototypeAST::new(function_name, vec![], false))
+    }
+
+    fn parse_function_body(&mut self) -> Result<ExprAST> {
+        parse!(self, TokenType::LeftCurly)?;
+        let body = self.parse_expression()?;
+        parse!(self, TokenType::Semicolon)?;
+        parse!(self, TokenType::RightCurly)?;
+        Ok(body)
+    }
+
     fn parse_top_level_expression(&mut self) -> Result<FunctionAST> {
         let body = self.parse_expression()?;
-        parse!(self, ';')?; // eat ';'
+        parse!(self, TokenType::Semicolon)?;
         let proto = PrototypeAST::new(ANONYMOUS_FUNCTION_NAME.into(), vec![], true);
         Ok(FunctionAST::new(proto, body))
     }
@@ -94,14 +124,14 @@ impl Parser {
     fn parse_number_expr(&mut self) -> Result<ExprAST> {
         let n = self.get_number_token()?;
         let result = ExprAST::new_number_expr(n);
-        self.advance_token(); // eat number
+        self.advance_token(); // todo: replace with parse!()
         Ok(result)
     }
 
     fn parse_paren_expr(&mut self) -> Result<ExprAST> {
-        parse!(self, '(')?; // eat '('
+        parse!(self, TokenType::LeftParen)?;
         let expr = self.parse_expression()?;
-        parse!(self, ')')?; // eat ')'
+        parse!(self, TokenType::RightParen)?;
         Ok(expr)
     }
 
@@ -145,6 +175,14 @@ impl Parser {
     fn get_number_token(&self) -> Result<i64> {
         self.current_token.token_type.number().ok_or_else(|| {
             ParseError::missing_token(self.lexer.get_context(), "number")
+                .with_pos(self.current_token.pos)
+                .into()
+        })
+    }
+
+    fn get_identifier_token(&self) -> Result<String> {
+        self.current_token.token_type.identifier().ok_or_else(|| {
+            ParseError::missing_token(self.lexer.get_context(), "Identifier")
                 .with_pos(self.current_token.pos)
                 .into()
         })

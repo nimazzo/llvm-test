@@ -76,20 +76,24 @@ impl Lexer {
             match start {
                 '(' => {
                     self.advance_index();
-                    return Token::new(pos, TokenType::LeftParen)
+                    return Token::new(pos, TokenType::LeftParen);
                 },
                 ')' => {
                     self.advance_index();
-                    return Token::new(pos, TokenType::RightParen)
+                    return Token::new(pos, TokenType::RightParen);
                 },
                 '{' => {
                     self.advance_index();
-                    return Token::new(pos, TokenType::LeftCurly)
+                    return Token::new(pos, TokenType::LeftCurly);
                 },
                 '}' => {
                     self.advance_index();
-                    return Token::new(pos, TokenType::RightCurly)
+                    return Token::new(pos, TokenType::RightCurly);
                 },
+                ';' => {
+                    self.advance_index();
+                    return Token::new(pos, TokenType::Semicolon);
+                }
                 _ => (),
             }
 
