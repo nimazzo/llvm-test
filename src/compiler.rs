@@ -46,7 +46,7 @@ impl<'ctx> Compiler<'ctx> {
 
         for node in ast {
             let (fun, params) = match node {
-                ASTPrimitive::PrototypeAST(proto) => {
+                ASTPrimitive::ExternAST(proto) => {
                     let fun = self.compile_fn_prototype(proto)?;
                     (fun, &proto.args)
                 }
@@ -106,6 +106,7 @@ impl<'ctx> Compiler<'ctx> {
 
             self.builder.build_store(alloca, arg);
 
+            // todo: when to remove them?
             self.variables.insert(arg_name.clone(), alloca);
         }
 

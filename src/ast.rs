@@ -3,14 +3,14 @@ use std::fmt::{Debug, Formatter};
 pub type AST = Vec<ASTPrimitive>;
 
 pub enum ASTPrimitive {
-    PrototypeAST(PrototypeAST),
+    ExternAST(PrototypeAST),
     FunctionAST(FunctionAST),
 }
 
 impl Debug for ASTPrimitive {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ASTPrimitive::PrototypeAST(proto) => {
+            ASTPrimitive::ExternAST(proto) => {
                 if f.alternate() {
                     f.write_fmt(format_args!("{:#?}", proto))
                 } else {
