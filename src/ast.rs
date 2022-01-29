@@ -62,6 +62,7 @@ pub enum ExprAST {
         lhs: Box<ExprAST>,
         rhs: Box<ExprAST>,
     },
+    NOP,
 }
 
 #[derive(Debug)]

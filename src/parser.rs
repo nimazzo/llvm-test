@@ -85,6 +85,13 @@ impl Parser {
 
     fn parse_function_body(&mut self) -> Result<ExprAST> {
         parse!(self, TokenType::LeftCurly)?;
+
+        // Function has empty body
+        if self.curr_token_type() == TokenType::RightCurly {
+            parse!(self, TokenType::RightCurly)?;
+            return Ok(ExprAST::NOP);
+        }
+
         let body = self.parse_expression()?;
         parse!(self, TokenType::Semicolon)?;
         parse!(self, TokenType::RightCurly)?;
@@ -124,7 +131,7 @@ impl Parser {
     fn parse_number_expr(&mut self) -> Result<ExprAST> {
         let n = self.get_number_token()?;
         let result = ExprAST::new_number_expr(n);
-        self.advance_token(); // todo: replace with parse!()
+        self.advance_token();
         Ok(result)
     }
 

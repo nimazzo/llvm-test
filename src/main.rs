@@ -31,8 +31,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let result: i64 = unsafe { program.call(fun.name()) };
         println!("result was: {}", result);
     }
-    //
-    // program.dump_bc("./output/program.bc")?;
+
+    program.dump_bc("./output/program.bc")?;
 
     Ok(())
 }
