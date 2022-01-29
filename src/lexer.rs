@@ -149,8 +149,8 @@ impl Lexer {
     fn skip_whitespace_and_comments(&mut self) {
         while self.has_more_tokens() {
             let c = self.get_current_char();
-            if c.is_whitespace() || c == '#' {
-                if c == '#' {
+            if c.is_whitespace() || c == '/' && self.peek(1) == Some('/') {
+                if c == '/' && self.peek(1) == Some('/') {
                     self.skip_comment();
                 } else {
                     self.skip_whitespace();

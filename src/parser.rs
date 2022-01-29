@@ -89,7 +89,7 @@ impl Parser {
         // Function has empty body
         if self.curr_token_type() == TokenType::RightCurly {
             parse!(self, TokenType::RightCurly)?;
-            return Ok(ExprAST::NOP);
+            return Ok(ExprAST::Nop);
         }
 
         let body = self.parse_expression()?;

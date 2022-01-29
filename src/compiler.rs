@@ -155,7 +155,7 @@ impl<'ctx> Compiler<'ctx> {
                     BinOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
                 }
             }
-            ExprAST::NOP => {
+            ExprAST::Nop => {
                 self.context.i64_type().const_int(0, false)
             }
         };
