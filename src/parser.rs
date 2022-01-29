@@ -42,14 +42,14 @@ impl Parser {
             match self.curr_token_type() {
                 TokenType::Fn => {
                     let fun = self.parse_function()?;
-                    program.push(ASTPrimitive::FunctionAST(fun));
+                    program.push(ASTPrimitive::Function(fun));
                 }
                 TokenType::Eof => {
                     break;
                 }
                 _ => {
                     let fun = self.parse_top_level_expression()?;
-                    program.push(ASTPrimitive::FunctionAST(fun));
+                    program.push(ASTPrimitive::Function(fun));
                 }
             }
         }

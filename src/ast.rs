@@ -1,23 +1,24 @@
 use std::fmt::{Debug, Formatter};
 
+#[allow(clippy::upper_case_acronyms)]
 pub type AST = Vec<ASTPrimitive>;
 
 pub enum ASTPrimitive {
-    ExternAST(PrototypeAST),
-    FunctionAST(FunctionAST),
+    Extern(PrototypeAST),
+    Function(FunctionAST),
 }
 
 impl Debug for ASTPrimitive {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ASTPrimitive::ExternAST(proto) => {
+            ASTPrimitive::Extern(proto) => {
                 if f.alternate() {
                     f.write_fmt(format_args!("{:#?}", proto))
                 } else {
                     f.write_fmt(format_args!("{:?}", proto))
                 }
             }
-            ASTPrimitive::FunctionAST(function) => {
+            ASTPrimitive::Function(function) => {
                 if f.alternate() {
                     f.write_fmt(format_args!("{:#?}", function))
                 } else {
@@ -54,10 +55,10 @@ impl FunctionAST {
 
 #[derive(Debug)]
 pub enum ExprAST {
-    NumberExprAST {
+    NumberExpr {
         value: i64,
     },
-    BinaryExprAST {
+    BinaryExpr {
         op: BinOp,
         lhs: Box<ExprAST>,
         rhs: Box<ExprAST>,
@@ -72,10 +73,10 @@ pub enum BinOp {
 
 impl ExprAST {
     pub fn new_number_expr(value: i64) -> Self {
-        Self::NumberExprAST { value }
+        Self::NumberExpr { value }
     }
 
     pub fn new_binary_expr(op: BinOp, lhs: Box<ExprAST>, rhs: Box<ExprAST>) -> Self {
-        Self::BinaryExprAST { op, lhs, rhs }
+        Self::BinaryExpr { op, lhs, rhs }
     }
 }

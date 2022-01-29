@@ -46,11 +46,11 @@ impl<'ctx> Compiler<'ctx> {
 
         for node in ast {
             let (fun, params) = match node {
-                ASTPrimitive::ExternAST(proto) => {
+                ASTPrimitive::Extern(proto) => {
                     let fun = self.compile_fn_prototype(proto)?;
                     (fun, &proto.args)
                 }
-                ASTPrimitive::FunctionAST(fun) => {
+                ASTPrimitive::Function(fun) => {
                     let proto = &fun.proto;
                     let body = &fun.body;
                     let fun = self.compile_fn(proto, body)?;
@@ -58,7 +58,7 @@ impl<'ctx> Compiler<'ctx> {
                 }
             };
 
-            let mut function = CompiledFunction::new(fun.get_name().to_str().unwrap().to_string());
+            let mut function = CompiledFunction::new(fun.get_name().to_str()?.to_string());
             params.iter().cloned().for_each(|arg| { function.add_argument(arg); });
             program_builder.add_function(function);
         }
@@ -146,10 +146,10 @@ impl<'ctx> Compiler<'ctx> {
 
     fn compile_expr(&self, expr: &ExprAST) -> Result<IntValue<'ctx>> {
         let value = match expr {
-            ExprAST::NumberExprAST { value } => {
+            ExprAST::NumberExpr { value } => {
                 self.context.i64_type().const_int(*value as u64, false) // todo: maybe change this to true?
             }
-            ExprAST::BinaryExprAST { op, lhs, rhs } => {
+            ExprAST::BinaryExpr { op, lhs, rhs } => {
                 let lhs = self.compile_expr(lhs)?;
                 let rhs = self.compile_expr(rhs)?;
                 match op {

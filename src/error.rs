@@ -67,8 +67,8 @@ impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut display = String::new();
         display.push_str(&Color::Red.paint("ParseError: ").to_string());
-        if self.row.is_some() && self.col.is_some() {
-            display.push_str(&Color::Red.paint(format!("at:({}:{}) ", self.row.unwrap(), self.col.unwrap())).to_string());
+        if let (Some(row), Some(col)) = (self.row, self.col) {
+            display.push_str(&Color::Red.paint(format!("at:({}:{}) ", row, col)).to_string());
         }
 
         display.push_str(&Color::Red.paint(format!("{}", self.error_type)).to_string());

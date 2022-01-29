@@ -17,29 +17,32 @@ impl CompiledProgram {
         &self.functions
     }
 
-    pub unsafe fn call<T>(&self, name: &str) -> T {
+    pub unsafe fn call<T>(&self, name: &str) -> Result<T> {
         let context = Context::create();
-        let ee = self.make_module(&context).create_jit_execution_engine(OptimizationLevel::None).unwrap();
-        let function = ee.get_function::<unsafe extern "C" fn() -> T>(name).unwrap();
-        function.call()
+        let ee = self.make_module(&context)?.create_jit_execution_engine(OptimizationLevel::None)
+            .map_err(|err| CompileError::JITCompilationError(err.to_string()))?;
+        let function = ee.get_function::<unsafe extern "C" fn() -> T>(name)
+            .map_err(|err| CompileError::JITCompilationError(err.to_string()))?;
+        Ok(function.call())
     }
 
-    pub fn print_llvm_ir(&self) {
+    pub fn print_llvm_ir(&self) -> Result<()> {
         let context = Context::create();
-        self.make_module(&context).print_to_stderr();
+        self.make_module(&context)?.print_to_stderr();
+        Ok(())
     }
 
     pub fn dump_bc<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let context = Context::create();
-        if !self.make_module(&context).write_bitcode_to_path(path.as_ref()) {
+        if !self.make_module(&context)?.write_bitcode_to_path(path.as_ref()) {
             return Err(CompileError::GenericCompilationError.into());
         }
         Ok(())
     }
 
-    fn make_module<'ctx>(&self, context: &'ctx Context) -> Module<'ctx> {
-        let module = Module::parse_bitcode_from_buffer(&self.bitcode, context).unwrap();
-        module
+    fn make_module<'ctx>(&self, context: &'ctx Context) -> Result<Module<'ctx>> {
+        Module::parse_bitcode_from_buffer(&self.bitcode, context)
+            .map_err(|err| CompileError::JITCompilationError(err.to_string()).into())
     }
 }
 

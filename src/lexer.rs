@@ -1,5 +1,6 @@
 use crate::token::{Token, TokenType};
 
+#[derive(Clone)]
 pub struct Lexer {
     input: Vec<char>,
     idx: usize,
@@ -54,8 +55,8 @@ impl Lexer {
         context
     }
 
-    pub fn tokens(&mut self) -> TokenIterator {
-        TokenIterator { lexer: self }
+    pub fn tokens(&self) -> TokenIterator {
+        TokenIterator { lexer: self.clone() }
     }
 
     /*========== Private Functions ==========*/
@@ -211,11 +212,11 @@ impl Lexer {
 }
 
 /*============ Token Iterator =============*/
-pub struct TokenIterator<'a> {
-    lexer: &'a mut Lexer,
+pub struct TokenIterator {
+    lexer: Lexer,
 }
 
-impl Iterator for TokenIterator<'_> {
+impl Iterator for TokenIterator {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {

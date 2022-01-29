@@ -19,16 +19,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     let input = include_str!("../sources/simple.txt");
 
     let lexer = Lexer::new(input);
+
+    println!("\n=============== Lexer ===============");
+    for token in lexer.tokens() {
+        println!("Parsed token: {} at:({}:{})", token.token_type, token.pos.0, token.pos.1);
+    }
+
     let mut parser = Parser::new(lexer);
     let ast = parser.parse().expect("failed to parse");
+
+    println!("\n=============== AST ===============");
     println!("{:#?}", ast);
     let mut compiler = Compiler::new()?;
     let program = compiler.compile(&ast)?;
 
-    program.print_llvm_ir();
+    println!("\n=============== LLVM IR ===============");
+    program.print_llvm_ir()?;
+
+    println!("\n=============== Function Output ===============");
     for fun in program.functions() {
         println!("Function: {}", fun.name());
-        let result: i64 = unsafe { program.call(fun.name()) };
+        let result: i64 = unsafe { program.call(fun.name())? };
         println!("result was: {}", result);
     }
 

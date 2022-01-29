@@ -8,7 +8,6 @@ pub struct Token {
 
 impl Token {
     pub fn new(pos: (usize, usize), token_type: TokenType) -> Self {
-        println!("Parsed Token: {} at:({}:{})", token_type, pos.0, pos.1);
         Self {
             pos,
             token_type,
