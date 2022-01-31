@@ -1,4 +1,5 @@
 use crate::token::{Token, TokenType};
+use crate::Console;
 
 #[derive(Clone)]
 pub struct Lexer {
@@ -7,13 +8,15 @@ pub struct Lexer {
     idx_token_start: usize,
     row: usize,
     col: usize,
+
+    console: Console,
 }
 
 impl Lexer {
-    pub fn new(source: &str) -> Self {
+    pub fn new(source: &str, console: Console) -> Self {
         #[cfg(windows)]
         ansi_term::enable_ansi_support()
-            .unwrap_or_else(|_| eprintln!("unable to enable ansi support"));
+            .unwrap_or_else(|_| console.force_println("[Warning] Unable to enable ansi support"));
 
         let input = source.chars().collect();
         Self {
@@ -22,15 +25,23 @@ impl Lexer {
             idx_token_start: 0,
             row: 1,
             col: 1,
+            console,
         }
     }
 
     pub fn next_token(&mut self) -> Token {
         self.idx_token_start = self.idx;
-        if !self.has_more_tokens() {
+        let token = if !self.has_more_tokens() {
             return Token::new(self.get_token_pos(), TokenType::Eof);
-        }
-        self.identify_token()
+        } else {
+            self.identify_token()
+        };
+
+        self.console.println_verbose(format!(
+            "[Lexer] Parsed token: {} at:({}:{})",
+            token.token_type, token.pos.0, token.pos.1
+        ));
+        token
     }
 
     pub fn get_context(&self) -> String {
@@ -42,7 +53,12 @@ impl Lexer {
         }
 
         let mut current_token = String::new();
-        for c in self.input.iter().skip(self.idx_token_start).take(self.idx - self.idx_token_start) {
+        for c in self
+            .input
+            .iter()
+            .skip(self.idx_token_start)
+            .take(self.idx - self.idx_token_start)
+        {
             current_token.push(*c);
         }
 
@@ -53,10 +69,6 @@ impl Lexer {
         }
 
         context
-    }
-
-    pub fn tokens(&self) -> TokenIterator {
-        TokenIterator { lexer: self.clone() }
     }
 
     /*========== Private Functions ==========*/
@@ -78,22 +90,29 @@ impl Lexer {
                 '(' => {
                     self.advance_index();
                     return Token::new(pos, TokenType::LeftParen);
-                },
+                }
                 ')' => {
                     self.advance_index();
                     return Token::new(pos, TokenType::RightParen);
-                },
+                }
                 '{' => {
                     self.advance_index();
                     return Token::new(pos, TokenType::LeftCurly);
-                },
+                }
                 '}' => {
                     self.advance_index();
                     return Token::new(pos, TokenType::RightCurly);
-                },
+                }
                 ';' => {
                     self.advance_index();
                     return Token::new(pos, TokenType::Semicolon);
+                }
+                '-' => {
+                    if self.peek(1) == Some('>') {
+                        self.advance_index();
+                        self.advance_index();
+                        return Token::new(pos, TokenType::RightArrow);
+                    }
                 }
                 _ => (),
             }
@@ -113,13 +132,13 @@ impl Lexer {
             } else {
                 self.advance_index();
                 Token::new(pos, TokenType::Other(start))
-            }
+            };
         }
 
         Token::new(pos, TokenType::Eof)
     }
 
-    fn parse_number(&mut self) -> i64 {
+    fn parse_number(&mut self) -> i32 {
         let mut number = String::new();
         while self.has_more_tokens() {
             let c = self.get_current_char();
@@ -179,13 +198,21 @@ impl Lexer {
     }
 
     fn skip_comment(&mut self) {
+        let pos = self.get_token_pos();
+        let mut comment = String::new();
         while self.has_more_tokens() {
             let c = self.get_current_char();
             if c == '\n' || c == '\r' {
                 break;
             }
+            comment.push(c);
             self.advance_index();
         }
+        let token = Token::new(pos, TokenType::Comment(comment));
+        self.console.println_verbose(format!(
+            "[Lexer] Parsed token: {} at:({}:{})",
+            token.token_type, token.pos.0, token.pos.1
+        ));
     }
 
     fn has_more_tokens(&self) -> bool {
@@ -208,22 +235,5 @@ impl Lexer {
     fn next_line(&mut self) {
         self.row += 1;
         self.col = 1;
-    }
-}
-
-/*============ Token Iterator =============*/
-pub struct TokenIterator {
-    lexer: Lexer,
-}
-
-impl Iterator for TokenIterator {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let next_token = self.lexer.next_token();
-        match next_token.token_type {
-            TokenType::Eof => None,
-            _ => Some(next_token),
-        }
     }
 }

@@ -10,3 +10,4 @@ inkwell = { version = "0.1.0-beta.4", features = ["llvm13-0"] }
 ansi_term = "0.12"
 anyhow = "1"
 thiserror = "1"
+clap = { version = "3", features = ["derive"] }

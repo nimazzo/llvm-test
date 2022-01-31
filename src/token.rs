@@ -18,7 +18,7 @@ impl Token {
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Eof,
-    Number(i64),
+    Number(i32),
     Plus,
     Fn,
     Identifier(String),
@@ -27,6 +27,8 @@ pub enum TokenType {
     LeftCurly,
     RightCurly,
     Semicolon,
+    RightArrow,
+    Comment(String),
     Other(char),
 }
 
@@ -34,7 +36,7 @@ impl Display for TokenType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             TokenType::Eof => f.write_str("<EOF>"),
-            TokenType::Number(n) => f.write_str(&format!("Number({})", *n)),
+            TokenType::Number(n) => f.write_str(&format!("Number('{}')", *n)),
             TokenType::Plus => f.write_str("Plus('+')"),
             TokenType::Fn => f.write_str("Fn"),
             TokenType::Identifier(id) => f.write_str(&format!("Identifier('{}')", id)),
@@ -43,22 +45,17 @@ impl Display for TokenType {
             TokenType::LeftCurly => f.write_str("LeftCurly('{')"),
             TokenType::RightCurly => f.write_str("RightCurly('}')"),
             TokenType::Semicolon => f.write_str("Semicolon(';')"),
+            TokenType::RightArrow => f.write_str("RightArrrow('->')"),
+            TokenType::Comment(c) => f.write_str(&format!("Comment('{}')", c)),
             TokenType::Other(c) => f.write_str(&format!("Other('{}')", *c)),
         }
     }
 }
 
 impl TokenType {
-    pub fn number(&self) -> Option<i64> {
+    pub fn number(&self) -> Option<i32> {
         match self {
             TokenType::Number(n) => Some(*n),
-            _ => None,
-        }
-    }
-
-    pub fn identifier(&self) -> Option<String> {
-        match self {
-            TokenType::Identifier(id) => Some(id.clone()),
             _ => None,
         }
     }

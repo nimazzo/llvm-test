@@ -3,47 +3,394 @@ extern crate inkwell;
 
 use crate::compiler::Compiler;
 use crate::lexer::Lexer;
-use crate::parser::Parser;
+use crate::program::CompiledProgram;
 use crate::token::TokenType;
+use clap::{ErrorKind, IntoApp, Parser, Subcommand};
 use std::error::Error;
+use std::ffi::OsStr;
+use std::fmt::{Arguments, Display};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+use crate::error::CompileError;
+use crate::interpreter::Interpreter;
+use anyhow::Result;
 
 mod ast;
 mod compiler;
 mod error;
+mod interpreter;
 mod lexer;
 mod parser;
 mod program;
 mod token;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let input = include_str!("../sources/simple.txt");
+#[derive(clap::Parser)]
+#[clap(
+    name = "Language Compiler",
+    version,
+    about = "Compiles source files",
+)]
+struct Cli {
+    #[clap(
+        short,
+        help = "Runs the program after successful compilation",
+        conflicts_with("interpret"),
+        conflicts_with("parse-only")
+    )]
+    run: bool,
 
-    let lexer = Lexer::new(input);
+    #[clap(
+        short,
+        long,
+        help = "Disables all compiler output",
+        conflicts_with("verbose"),
+        conflicts_with("print-ast"),
+        conflicts_with("print-ir")
+    )]
+    quiet: bool,
 
-    println!("\n=============== Lexer ===============");
-    for token in lexer.tokens() {
-        println!("Parsed token: {} at:({}:{})", token.token_type, token.pos.0, token.pos.1);
+    #[clap(short, long, help = "Show verbose output", conflicts_with("quiet"))]
+    verbose: bool,
+
+    #[clap(
+        long,
+        help = "Only parse source file, don't generate output files",
+        conflicts_with("run"),
+        conflicts_with("out")
+    )]
+    parse_only: bool,
+
+    #[clap(
+        short,
+        help = "Interprets the program without compiling",
+        conflicts_with("run"),
+        conflicts_with("print-ir"),
+        conflicts_with("out")
+    )]
+    interpret: bool,
+
+    #[clap(long, help = "Print the parsed AST structure", conflicts_with("quiet"))]
+    print_ast: bool,
+
+    #[clap(
+        long,
+        help = "Print the llvm ir code",
+        conflicts_with("interpret"),
+        conflicts_with("quiet")
+    )]
+    print_ir: bool,
+
+    #[clap(
+        short,
+        long,
+        help = "Delete intermediate files",
+        conflicts_with("interpret"),
+        conflicts_with("parse-only")
+    )]
+    clean: bool,
+
+    #[clap(
+        short,
+        long,
+        help = "Output path for generated files",
+        conflicts_with("interpret"),
+        conflicts_with("parse-only")
+    )]
+    out: Option<PathBuf>,
+
+    #[clap(help = "Path to source file")]
+    source: PathBuf,
+
+    #[clap(subcommand)]
+    subcommand: Option<CliSubcommand>,
+}
+
+#[derive(Subcommand, Debug)]
+enum CliSubcommand {
+    #[clap(about = "Analyze Program AST")]
+    Analyzer {
+        #[clap(short, long, help = "Prints the functions contained in the program")]
+        print_functions: bool,
+    },
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
+    let cli = Cli::parse();
+    let console = Console {
+        quiet: cli.quiet,
+        verbose: cli.verbose,
+    };
+
+    let mut err_app = Cli::into_app();
+    err_app.set_bin_name(
+        std::env::args()
+            .next()
+            .as_ref()
+            .map(Path::new)
+            .and_then(Path::file_name)
+            .and_then(OsStr::to_str)
+            .ok_or_else(|| {
+                CompileError::GenericCompilationError("Could not get binary name".into())
+            })?,
+    );
+
+    if !cli.source.exists() {
+        err_app
+            .error(
+                ErrorKind::ArgumentConflict,
+                format!("Could not find source file {:?}", cli.source),
+            )
+            .exit();
     }
 
-    let mut parser = Parser::new(lexer);
-    let ast = parser.parse().expect("failed to parse");
+    let input = std::fs::read_to_string(&cli.source)?;
 
-    println!("\n=============== AST ===============");
-    println!("{:#?}", ast);
+    let lexer = Lexer::new(&input, console);
+    let mut parser = parser::Parser::new(lexer, console);
+    let ast = parser.parse()?;
+
+    if cli.print_ast {
+        console.println("\n=========== AST ===========");
+        console.println(format!("{:#?}", ast));
+    }
+
+    if cli.interpret {
+        let mut interpreter = Interpreter::new();
+        interpreter.run(&ast, console);
+        return Ok(());
+    }
+
     let mut compiler = Compiler::new()?;
     let program = compiler.compile(&ast)?;
 
-    println!("\n=============== LLVM IR ===============");
-    program.print_llvm_ir()?;
-
-    println!("\n=============== Function Output ===============");
-    for fun in program.functions() {
-        println!("Function: {}", fun.name());
-        let result: i64 = unsafe { program.call(fun.name())? };
-        println!("result was: {}", result);
+    if cli.print_ir {
+        let ir = program.get_llvm_ir()?;
+        console.println("\n=========== LLVM IR ===========");
+        console.println(ir);
     }
 
-    program.dump_bc("./output/program.bc")?;
+    if let Some(cmd) = cli.subcommand {
+        match cmd {
+            CliSubcommand::Analyzer { print_functions } => {
+                subcommand::analyzer(&program, print_functions);
+            }
+        }
+        return Ok(());
+    }
+
+    if cli.parse_only {
+        return Ok(());
+    }
+
+    let out_path = match cli.out {
+        Some(out_path) => {
+            let parent_path = out_path.parent();
+            let file_name = PathBuf::from(out_path.file_stem().ok_or_else(|| {
+                CompileError::GenericCompilationError("Invalid output path".into())
+            })?);
+            if let Some(parent) = parent_path {
+                parent.join(file_name)
+            } else {
+                file_name
+            }
+        }
+        None => cli.source,
+    };
+
+    create_ir_file(&program, &out_path, console)?;
+    create_bitcode(&program, &out_path, console)?;
+    create_obj_file(&out_path, console)?;
+    create_executable(&out_path, console)?;
+
+    if cli.clean {
+        cleanup(&out_path, console);
+    }
+
+    if cli.run {
+        run_program(&out_path, console)?;
+    }
 
     Ok(())
+}
+
+fn create_ir_file(
+    program: &CompiledProgram,
+    out_path: impl AsRef<Path>,
+    console: Console,
+) -> Result<()> {
+    console.println("[Compiler] Generating IR Code");
+    program.dump_ir(out_path.as_ref().with_extension("ir"))
+}
+
+fn create_bitcode(
+    program: &CompiledProgram,
+    out_path: impl AsRef<Path>,
+    console: Console,
+) -> Result<()> {
+    console.println("[Compiler] Generating Bitcode");
+    program.dump_bc(out_path.as_ref().with_extension("bc"))
+}
+
+fn create_obj_file(out_path: impl AsRef<Path>, console: Console) -> Result<Output> {
+    console.println("[Compiler] Generating Object File");
+    let bc_path = out_path.as_ref().with_extension("bc");
+    let obj_path = out_path.as_ref().with_extension("o");
+    let mut cmd = Command::new("llc");
+    cmd.arg("-filetype=obj")
+        .arg("-o")
+        .arg(obj_path)
+        .arg(bc_path);
+    console.println(format!("[CMD] {:?}", cmd));
+    cmd.output()
+        .map_err(|err| CompileError::GenericCompilationError(err.to_string()).into())
+}
+
+fn create_executable(out_path: impl AsRef<Path>, console: Console) -> Result<Output> {
+    console.println("[Compiler] Generating Executable File");
+    let obj_path = out_path.as_ref().with_extension("o");
+    let exe_path = out_path.as_ref().with_extension("exe");
+    let mut cmd = Command::new("clang");
+    cmd.arg(obj_path).arg("-o").arg(exe_path);
+    console.println(format!("[CMD] {:?}", cmd));
+    cmd.output()
+        .map_err(|err| CompileError::GenericCompilationError(err.to_string()).into())
+}
+
+fn cleanup(out_path: impl AsRef<Path>, console: Console) {
+    let ir_file = out_path.as_ref().with_extension("ir");
+    let bc_file = out_path.as_ref().with_extension("bc");
+    let o_file = out_path.as_ref().with_extension("o");
+
+    for file in &[ir_file, bc_file, o_file] {
+        if file.exists() {
+            match std::fs::remove_file(file) {
+                Ok(_) => {
+                    console.println(format!("[Compiler] Successfully removed file {:?}", file));
+                }
+                Err(e) => {
+                    console.println(format!("[Warning] Could not remove file {:?}: {}", file, e));
+                }
+            }
+        }
+    }
+}
+
+fn run_program(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
+    console.println("[Compiler] Executing compiled program");
+    let exe_path = out_path.as_ref().with_extension("exe");
+    let mut cmd = Command::new(&exe_path);
+    console.println(format!("[CMD] {:?}", cmd));
+    let output = cmd.output().map_err(|e| {
+        CompileError::GenericCompilationError(format!(
+            "Could not run program '{:?}': {}",
+            exe_path, e
+        ))
+    })?;
+
+    match output.status.code() {
+        Some(code) => console.force_println(format!(
+            "[Compiler] Program exited with status code: {}",
+            code
+        )),
+        None => console.force_println("[Compiler] Process terminated by signal"),
+    }
+
+    Ok(())
+}
+
+#[allow(dead_code)]
+#[derive(Copy, Clone)]
+pub struct Console {
+    quiet: bool,
+    verbose: bool,
+}
+
+#[allow(dead_code)]
+impl Console {
+    fn quiet() -> Self {
+        Self {
+            quiet: true,
+            verbose: false,
+        }
+    }
+    fn normal() -> Self {
+        Self {
+            quiet: false,
+            verbose: false,
+        }
+    }
+    fn verbose() -> Self {
+        Self {
+            quiet: false,
+            verbose: true,
+        }
+    }
+}
+
+mod subcommand {
+    use crate::{CompiledProgram, Console};
+
+    pub fn analyzer(program: &CompiledProgram, print_functions: bool) {
+        let console = Console::normal();
+        if print_functions {
+            print_functions_(program, console);
+        }
+    }
+
+    fn print_functions_(program: &CompiledProgram, console: Console) {
+        console.println("[Analyzer] Following functions are defined in the program:");
+        for fun in program.functions() {
+            console.println(fun);
+        }
+    }
+}
+
+impl Write for Console {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if !self.quiet {
+            return Ok(0);
+        }
+        std::io::stdout().write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if !self.quiet {
+            return Ok(());
+        }
+        std::io::stdout().flush()
+    }
+
+    fn write_fmt(&mut self, fmt: Arguments<'_>) -> std::io::Result<()> {
+        if !self.quiet {
+            return Ok(());
+        }
+        std::io::stdout().write_fmt(fmt)
+    }
+}
+
+impl Console {
+    fn println(&self, s: impl Display) {
+        if !self.quiet {
+            println!("{}", s);
+        }
+    }
+
+    fn force_println(&self, s: impl Display) {
+        println!("{}", s);
+    }
+
+    fn println_verbose(&self, s: impl Display) {
+        if self.verbose {
+            println!("{}", s);
+        }
+    }
+}
+
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    }
 }

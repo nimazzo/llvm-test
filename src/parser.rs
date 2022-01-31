@@ -1,7 +1,7 @@
 use crate::token::Token;
-use crate::{token, Lexer, TokenType};
+use crate::{token, Lexer, TokenType, Console};
 
-use crate::ast::{ASTPrimitive, BinOp, ExprAST, FunctionAST, AST, PrototypeAST};
+use crate::ast::{ASTPrimitive, BinOp, ExprAST, FunctionAST, AST, PrototypeAST, ExprType};
 use crate::error::ParseError;
 use anyhow::Result;
 
@@ -22,17 +22,48 @@ macro_rules! parse {
     }};
 }
 
+macro_rules! parse_identifier {
+    ($self: ident) => {{
+        match $self.curr_token_type() {
+            TokenType::Identifier(id) => {
+                $self.advance_token();
+                Ok(id)
+            },
+            _ => Err(
+                ParseError::missing_token($self.lexer.get_context(), "Identifier")
+                    .with_pos($self.current_token.pos),
+            ),
+        }
+    }};
+}
+
+macro_rules! peek_identifier {
+    ($self: ident) => {{
+        match $self.curr_token_type() {
+            TokenType::Identifier(id) => {
+                Ok(id)
+            },
+            _ => Err(
+                ParseError::missing_token($self.lexer.get_context(), "Identifier")
+                    .with_pos($self.current_token.pos),
+            ),
+        }
+    }};
+}
+
 pub struct Parser {
     lexer: Lexer,
     current_token: Token,
+    console: Console,
 }
 
 impl Parser {
-    pub fn new(mut lexer: Lexer) -> Self {
+    pub fn new(mut lexer: Lexer, console: Console) -> Self {
         let token = lexer.next_token();
         Self {
             lexer,
             current_token: token,
+            console,
         }
     }
 
@@ -68,22 +99,33 @@ impl Parser {
     }
 
     fn parse_function(&mut self) -> Result<FunctionAST> {
+        self.console.println_verbose("[Parser] Trying to parse function");
         let proto = self.parse_function_prototype()?;
         let body = self.parse_function_body()?;
+        self.console.println_verbose("[Parser] Successfully parsed function");
         Ok(FunctionAST::new(proto, body))
     }
 
     fn parse_function_prototype(&mut self) -> Result<PrototypeAST> {
+        self.console.println_verbose("[Parser] Trying to parse function prototype");
         parse!(self, TokenType::Fn)?;
-        let function_name = self.get_identifier_token()?;
-        self.advance_token(); // eat fn identifier
+        let function_name = parse_identifier!(self)?;
         // todo: parse arguments
         parse!(self, TokenType::LeftParen)?;
         parse!(self, TokenType::RightParen)?;
-        Ok(PrototypeAST::new(function_name, vec![]))
+        parse!(self, TokenType::RightArrow)?;
+        let pos = self.current_token.pos;
+        let type_identifier = peek_identifier!(self)?;
+        let ret_type = ExprType::try_from(type_identifier.as_str())
+            .map_err(|_| ParseError::missing_token(self.lexer.get_context(), "Type").with_pos(pos))?;
+
+        self.advance_token(); // eat type token
+        self.console.println_verbose("[Parser] Successfully parsed function prototype");
+        Ok(PrototypeAST::new(function_name, vec![], ret_type))
     }
 
     fn parse_function_body(&mut self) -> Result<ExprAST> {
+        self.console.println_verbose("[Parser] Trying to parse function body");
         parse!(self, TokenType::LeftCurly)?;
 
         // Function has empty body
@@ -95,13 +137,16 @@ impl Parser {
         let body = self.parse_expression()?;
         parse!(self, TokenType::Semicolon)?;
         parse!(self, TokenType::RightCurly)?;
+        self.console.println_verbose("[Parser] Successfully parsed function body");
         Ok(body)
     }
 
     fn parse_top_level_expression(&mut self) -> Result<FunctionAST> {
+        self.console.println_verbose("[Parser] Trying to parse top level expression");
         let body = self.parse_expression()?;
         parse!(self, TokenType::Semicolon)?;
-        let proto = PrototypeAST::new(ANONYMOUS_FUNCTION_NAME.into(), vec![]);
+        let proto = PrototypeAST::new(ANONYMOUS_FUNCTION_NAME.into(), vec![], ExprType::Void);
+        self.console.println_verbose("[Parser] Successfully parsed top level expression");
         Ok(FunctionAST::new(proto, body))
     }
 
@@ -179,17 +224,9 @@ impl Parser {
         }
     }
 
-    fn get_number_token(&self) -> Result<i64> {
+    fn get_number_token(&self) -> Result<i32> {
         self.current_token.token_type.number().ok_or_else(|| {
             ParseError::missing_token(self.lexer.get_context(), "number")
-                .with_pos(self.current_token.pos)
-                .into()
-        })
-    }
-
-    fn get_identifier_token(&self) -> Result<String> {
-        self.current_token.token_type.identifier().ok_or_else(|| {
-            ParseError::missing_token(self.lexer.get_context(), "Identifier")
                 .with_pos(self.current_token.pos)
                 .into()
         })

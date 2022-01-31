@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use ansi_term::Color;
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -22,8 +22,8 @@ enum ParseErrorType {
 
 #[derive(Error, Debug)]
 pub enum CompileError {
-    #[error("Unable to compile program")]
-    GenericCompilationError,
+    #[error("Unable to compile program: {0}")]
+    GenericCompilationError(String),
     #[error("Unable to JIT compile function: {0}")]
     JITCompilationError(String),
 }
@@ -68,7 +68,11 @@ impl Display for ParseError {
         let mut display = String::new();
         display.push_str(&Color::Red.paint("ParseError: ").to_string());
         if let (Some(row), Some(col)) = (self.row, self.col) {
-            display.push_str(&Color::Red.paint(format!("at:({}:{}) ", row, col)).to_string());
+            display.push_str(
+                &Color::Red
+                    .paint(format!("at:({}:{}) ", row, col))
+                    .to_string(),
+            );
         }
 
         display.push_str(&Color::Red.paint(format!("{}", self.error_type)).to_string());

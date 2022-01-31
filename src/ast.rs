@@ -32,12 +32,13 @@ impl Debug for ASTPrimitive {
 #[derive(Debug)]
 pub struct PrototypeAST {
     pub name: String,
-    pub args: Vec<String>,
+    pub args: Vec<(String, ExprType)>,
+    pub ty: ExprType,
 }
 
 impl PrototypeAST {
-    pub fn new(name: String, args: Vec<String>) -> Self {
-        Self { name, args }
+    pub fn new(name: String, args: Vec<(String, ExprType)>, ty: ExprType) -> Self {
+        Self { name, args, ty }
     }
 }
 
@@ -56,7 +57,7 @@ impl FunctionAST {
 #[derive(Debug)]
 pub enum ExprAST {
     NumberExpr {
-        value: i64,
+        value: i32,
     },
     BinaryExpr {
         op: BinOp,
@@ -66,17 +67,78 @@ pub enum ExprAST {
     Nop,
 }
 
-#[derive(Debug)]
-pub enum BinOp {
-    Add,
-}
-
 impl ExprAST {
-    pub fn new_number_expr(value: i64) -> Self {
+    pub fn new_number_expr(value: i32) -> Self {
         Self::NumberExpr { value }
     }
 
     pub fn new_binary_expr(op: BinOp, lhs: Box<ExprAST>, rhs: Box<ExprAST>) -> Self {
         Self::BinaryExpr { op, lhs, rhs }
+    }
+
+    pub fn type_of(&self) -> ExprType {
+        match self {
+            ExprAST::NumberExpr { .. } => ExprType::Integer,
+            ExprAST::BinaryExpr { op, lhs, rhs } => op.type_of(lhs, rhs),
+            ExprAST::Nop => ExprType::Void,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum BinOp {
+    Add,
+}
+
+impl BinOp {
+    pub fn type_of(&self, lhs: &ExprAST, rhs: &ExprAST) -> ExprType {
+        match self {
+            BinOp::Add => {
+                let ltype = lhs.type_of();
+                let rtype = rhs.type_of();
+
+                if ltype == rtype {
+                    ltype
+                } else {
+                    panic!("Type mismatch, handle this later");
+                }
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Copy, Clone)]
+pub enum ExprType {
+    String,
+    Integer,
+    Void,
+}
+
+impl Debug for ExprType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl TryFrom<&str> for ExprType {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "String" => Ok(ExprType::String),
+            "int" => Ok(ExprType::Integer),
+            "void" => Ok(ExprType::Void),
+            _ => Err(())
+        }
+    }
+}
+
+impl ExprType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ExprType::String => "String",
+            ExprType::Integer => "int",
+            ExprType::Void => "void",
+        }
     }
 }

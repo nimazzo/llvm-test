@@ -45,21 +45,21 @@ impl<'ctx> Compiler<'ctx> {
         let mut program_builder = ProgramBuilder::new();
 
         for node in ast {
-            let (fun, params) = match node {
+            let (fun, params, ty) = match node {
                 ASTPrimitive::Extern(proto) => {
                     let fun = self.compile_fn_prototype(proto)?;
-                    (fun, &proto.args)
+                    (fun, &proto.args, proto.ty)
                 }
                 ASTPrimitive::Function(fun) => {
                     let proto = &fun.proto;
                     let body = &fun.body;
                     let fun = self.compile_fn(proto, body)?;
-                    (fun, &proto.args)
+                    (fun, &proto.args, proto.ty)
                 }
             };
 
-            let mut function = CompiledFunction::new(fun.get_name().to_str()?.to_string());
-            params.iter().cloned().for_each(|arg| { function.add_argument(arg); });
+            let mut function = CompiledFunction::new(fun.get_name().to_str()?.to_string(), ty);
+            params.iter().cloned().for_each(|arg| { function.add_argument(arg.0, arg.1); });
             program_builder.add_function(function);
         }
         let code = self.module.write_bitcode_to_memory();
@@ -71,20 +71,21 @@ impl<'ctx> Compiler<'ctx> {
         let name = &proto.name;
         let args = &proto.args;
 
-        // return type of every function is i64
-        let ret_type = self.context.i64_type();
-        // type of every function argument is i64
+        // return type of every function is i32
+        let ret_type = self.context.i32_type();
+        // type of every function argument is i32
         let args_types = std::iter::repeat(ret_type)
             .map(|ty| ty.into())
             .take(args.len())
             .collect::<Vec<BasicMetadataTypeEnum>>();
 
-        let fn_type = self.context.i64_type().fn_type(&args_types, false);
+        // todo: Remove hardcoded i32 types and replace with real types
+        let fn_type = self.context.i32_type().fn_type(&args_types, false);
         let fn_val = self.module.add_function(name, fn_type, None);
 
         for (i, arg) in fn_val.get_param_iter().enumerate() {
             assert!(arg.is_int_value(), "function argument was not a int");
-            arg.into_int_value().set_name(&args[i]);
+            arg.into_int_value().set_name(&args[i].0);
         }
 
         Ok(fn_val)
@@ -102,12 +103,12 @@ impl<'ctx> Compiler<'ctx> {
 
         for (i, arg) in function.get_param_iter().enumerate() {
             let arg_name = &proto.args[i];
-            let alloca = self.create_entry_block_alloca(arg_name);
+            let alloca = self.create_entry_block_alloca(&arg_name.0);
 
             self.builder.build_store(alloca, arg);
 
             // todo: when to remove them?
-            self.variables.insert(arg_name.clone(), alloca);
+            self.variables.insert(arg_name.0.clone(), alloca);
         }
 
         // compile functoin body
@@ -121,7 +122,7 @@ impl<'ctx> Compiler<'ctx> {
             unsafe {
                 function.delete();
             }
-            Err(CompileError::GenericCompilationError.into())
+            Err(CompileError::GenericCompilationError("Could not build function".into()).into())
         }
     }
 
@@ -141,13 +142,13 @@ impl<'ctx> Compiler<'ctx> {
             }
         }
 
-        builder.build_alloca(self.context.i64_type(), name)
+        builder.build_alloca(self.context.i32_type(), name)
     }
 
     fn compile_expr(&self, expr: &ExprAST) -> Result<IntValue<'ctx>> {
         let value = match expr {
             ExprAST::NumberExpr { value } => {
-                self.context.i64_type().const_int(*value as u64, false) // todo: maybe change this to true?
+                self.context.i32_type().const_int(*value as u64, false) // todo: maybe change this to true?
             }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 let lhs = self.compile_expr(lhs)?;
@@ -157,7 +158,7 @@ impl<'ctx> Compiler<'ctx> {
                 }
             }
             ExprAST::Nop => {
-                self.context.i64_type().const_int(0, false)
+                self.context.i32_type().const_int(0, false)
             }
         };
         Ok(value)
