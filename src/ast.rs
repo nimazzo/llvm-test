@@ -4,6 +4,7 @@ use std::fmt::{Debug, Formatter};
 pub type AST = Vec<ASTPrimitive>;
 
 pub enum ASTPrimitive {
+    #[allow(dead_code)]
     Extern(PrototypeAST),
     Function(FunctionAST),
 }
