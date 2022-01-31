@@ -26,6 +26,13 @@ mod parser;
 mod program;
 mod token;
 
+#[macro_export]
+macro_rules! here {
+    () => {
+        format!("{}:{}:{} ", file!(), line!(), column!())
+    };
+}
+
 #[derive(clap::Parser)]
 #[clap(
     name = "Language Compiler",

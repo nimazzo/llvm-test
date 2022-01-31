@@ -44,7 +44,8 @@ impl<'a> Interpreter<'a> {
 
     fn eval_expr(&self, expr: &ExprAST) -> ExprResult {
         match expr {
-            ExprAST::Integer { value } => { ExprResult::Number(*value) }
+            ExprAST::Integer(value) => { ExprResult::Number(*value) }
+            ExprAST::String(s) => { ExprResult::String(s.clone()) }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 match op {
                     BinOp::Add => {
@@ -75,6 +76,7 @@ impl<'a> Interpreter<'a> {
 #[derive(Debug)]
 enum ExprResult {
     Number(i32),
+    String(String),
     Null,
     TypeMismatchError(String),
 }

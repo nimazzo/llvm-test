@@ -153,9 +153,10 @@ impl<'ctx> Compiler<'ctx> {
 
     fn compile_expr(&self, expr: &ExprAST) -> Option<BasicValueEnum<'ctx>> {
         let value = match expr {
-            ExprAST::Integer { value } => {
+            ExprAST::Integer(value) => {
                 self.context.i32_type().const_int(*value as u64, false).into() // todo: maybe change this to true?
             }
+            ExprAST::String(_) => { unimplemented!("Strings are not implemented yet") }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 let t1 = lhs.type_of();
                 let t2 = lhs.type_of();
