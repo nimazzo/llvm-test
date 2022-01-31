@@ -44,11 +44,18 @@ impl Lexer {
         token
     }
 
-    pub fn get_context(&self) -> String {
+    pub fn get_token_idx(&self) -> usize {
+        self.idx
+    }
+
+    pub fn get_context(&self, start: Option<usize>, end: Option<usize>) -> String {
+        let start = start.unwrap_or(self.idx_token_start);
+        let end = end.unwrap_or(self.idx);
+
         let mut context = String::new();
 
         // todo: might want to hide unrelated lines in the beginning
-        for c in self.input.iter().take(self.idx_token_start) {
+        for c in self.input.iter().take(start) {
             context.push(*c);
         }
 
@@ -56,18 +63,19 @@ impl Lexer {
         for c in self
             .input
             .iter()
-            .skip(self.idx_token_start)
-            .take(self.idx - self.idx_token_start)
+            .skip(start)
+            .take(end - start)
         {
             current_token.push(*c);
         }
 
         context.push_str(&ansi_term::Color::Red.paint(current_token).to_string());
 
-        for c in self.input.iter().skip(self.idx).take(30) {
+        for c in self.input.iter().skip(end).take(30) {
             context.push(*c);
         }
 
+        let context = context.lines().map(|line| format!("    {}\n", line)).collect::<String>();
         context
     }
 

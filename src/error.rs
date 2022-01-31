@@ -16,6 +16,8 @@ enum ParseErrorType {
     MissingToken(String),
     #[error("Not a primary expression: {0}")]
     NoPrimaryExpression(String),
+    #[error("Incompatible types: Expected: '{0}' Found: '{1}'")]
+    UnexpectedType(String, String),
     #[error("Unexpected end of file")]
     UnexpectedEOF,
 }
@@ -51,6 +53,15 @@ impl ParseError {
         Self {
             context,
             error_type: ParseErrorType::UnexpectedEOF,
+            row: None,
+            col: None,
+        }
+    }
+
+    pub fn unexpected_type(context: String, t1: &str, t2: &str) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::UnexpectedType(t1.into(), t2.into()),
             row: None,
             col: None,
         }

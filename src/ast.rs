@@ -56,7 +56,7 @@ impl FunctionAST {
 
 #[derive(Debug)]
 pub enum ExprAST {
-    NumberExpr {
+    Integer {
         value: i32,
     },
     BinaryExpr {
@@ -68,8 +68,8 @@ pub enum ExprAST {
 }
 
 impl ExprAST {
-    pub fn new_number_expr(value: i32) -> Self {
-        Self::NumberExpr { value }
+    pub fn new_integer_expr(value: i32) -> Self {
+        Self::Integer { value }
     }
 
     pub fn new_binary_expr(op: BinOp, lhs: Box<ExprAST>, rhs: Box<ExprAST>) -> Self {
@@ -78,7 +78,7 @@ impl ExprAST {
 
     pub fn type_of(&self) -> ExprType {
         match self {
-            ExprAST::NumberExpr { .. } => ExprType::Integer,
+            ExprAST::Integer { .. } => ExprType::Integer,
             ExprAST::BinaryExpr { op, lhs, rhs } => op.type_of(lhs, rhs),
             ExprAST::Nop => ExprType::Void,
         }

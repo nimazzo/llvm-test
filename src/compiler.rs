@@ -1,9 +1,9 @@
-use crate::ast::{ASTPrimitive, BinOp, ExprAST, AST, PrototypeAST};
+use crate::ast::{ASTPrimitive, BinOp, ExprAST, AST, PrototypeAST, ExprType};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
-use inkwell::values::{BasicValue, FunctionValue, IntValue, PointerValue};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -71,16 +71,20 @@ impl<'ctx> Compiler<'ctx> {
         let name = &proto.name;
         let args = &proto.args;
 
-        // return type of every function is i32
-        let ret_type = self.context.i32_type();
-        // type of every function argument is i32
-        let args_types = std::iter::repeat(ret_type)
-            .map(|ty| ty.into())
-            .take(args.len())
-            .collect::<Vec<BasicMetadataTypeEnum>>();
+        let args_types = args.iter().map(|(_, ty)| {
+            match ty {
+                ExprType::String => { unimplemented!("Strings are not implemented yet") }
+                ExprType::Integer => { self.context.i32_type() }
+                ExprType::Void => { unreachable!("Function arguments can't have void type") }
+            }
+        }).map(|ty| ty.into()).collect::<Vec<BasicMetadataTypeEnum>>();
 
-        // todo: Remove hardcoded i32 types and replace with real types
-        let fn_type = self.context.i32_type().fn_type(&args_types, false);
+        let fn_type = match &proto.ty {
+            ExprType::String => { unimplemented!("Strings are not implemented yet") }
+            ExprType::Integer => { self.context.i32_type().fn_type(&args_types, false) }
+            ExprType::Void => { self.context.void_type().fn_type(&args_types, false) }
+        };
+
         let fn_val = self.module.add_function(name, fn_type, None);
 
         for (i, arg) in fn_val.get_param_iter().enumerate() {
@@ -111,10 +115,12 @@ impl<'ctx> Compiler<'ctx> {
             self.variables.insert(arg_name.0.clone(), alloca);
         }
 
-        // compile functoin body
-        let body = self.compile_expr(body)?;
-
-        self.builder.build_return(Some(&body));
+        // compile function body
+        if let Some(body) =  self.compile_expr(body) {
+            self.builder.build_return(Some(&body));
+        } else {
+            self.builder.build_return(None);
+        }
 
         if function.verify(true) {
             Ok(function)
@@ -145,22 +151,34 @@ impl<'ctx> Compiler<'ctx> {
         builder.build_alloca(self.context.i32_type(), name)
     }
 
-    fn compile_expr(&self, expr: &ExprAST) -> Result<IntValue<'ctx>> {
+    fn compile_expr(&self, expr: &ExprAST) -> Option<BasicValueEnum<'ctx>> {
         let value = match expr {
-            ExprAST::NumberExpr { value } => {
-                self.context.i32_type().const_int(*value as u64, false) // todo: maybe change this to true?
+            ExprAST::Integer { value } => {
+                self.context.i32_type().const_int(*value as u64, false).into() // todo: maybe change this to true?
             }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
+                let t1 = lhs.type_of();
+                let t2 = lhs.type_of();
+
                 let lhs = self.compile_expr(lhs)?;
                 let rhs = self.compile_expr(rhs)?;
+
                 match op {
-                    BinOp::Add => self.builder.build_int_add(lhs, rhs, "tmpadd"),
+                    BinOp::Add => {
+                        match (lhs, rhs) {
+                            (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
+                                self.builder.build_int_add(v1, v2, "tmpadd").into()
+                            }
+                            _ => unimplemented!("BinOp::Add not implemented for {} and {}", t1.as_str(), t2.as_str()),
+                        }
+                    },
                 }
             }
             ExprAST::Nop => {
-                self.context.i32_type().const_int(0, false)
+                // self.context.i32_type().const_int(0, false)
+                return None;
             }
         };
-        Ok(value)
+        Some(value)
     }
 }

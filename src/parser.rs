@@ -15,7 +15,7 @@ macro_rules! parse {
                 Ok(token)
             },
             _ => Err(
-                ParseError::missing_token($self.lexer.get_context(), &format!("{}", $tk))
+                ParseError::missing_token($self.lexer.get_context(None, None), &format!("{}", $tk))
                     .with_pos($self.current_token.pos),
             ),
         }
@@ -30,7 +30,7 @@ macro_rules! parse_identifier {
                 Ok(id)
             },
             _ => Err(
-                ParseError::missing_token($self.lexer.get_context(), "Identifier")
+                ParseError::missing_token($self.lexer.get_context(None, None), "Identifier")
                     .with_pos($self.current_token.pos),
             ),
         }
@@ -44,7 +44,7 @@ macro_rules! peek_identifier {
                 Ok(id)
             },
             _ => Err(
-                ParseError::missing_token($self.lexer.get_context(), "Identifier")
+                ParseError::missing_token($self.lexer.get_context(None, None), "Identifier")
                     .with_pos($self.current_token.pos),
             ),
         }
@@ -101,10 +101,16 @@ impl Parser {
     fn parse_function(&mut self) -> Result<FunctionAST> {
         self.console.println_verbose("[Parser] Trying to parse function");
         let proto = self.parse_function_prototype()?;
+        let context_start = self.lexer.get_token_idx() - 1;
         let body = self.parse_function_body()?;
+        let context_end = self.lexer.get_token_idx();
+
+        self.type_check_function(&proto, &body, context_start, context_end)?;
+
         self.console.println_verbose("[Parser] Successfully parsed function");
         Ok(FunctionAST::new(proto, body))
     }
+
 
     fn parse_function_prototype(&mut self) -> Result<PrototypeAST> {
         self.console.println_verbose("[Parser] Trying to parse function prototype");
@@ -117,7 +123,7 @@ impl Parser {
         let pos = self.current_token.pos;
         let type_identifier = peek_identifier!(self)?;
         let ret_type = ExprType::try_from(type_identifier.as_str())
-            .map_err(|_| ParseError::missing_token(self.lexer.get_context(), "Type").with_pos(pos))?;
+            .map_err(|_| ParseError::missing_token(self.lexer.get_context(None, None), "Type").with_pos(pos))?;
 
         self.advance_token(); // eat type token
         self.console.println_verbose("[Parser] Successfully parsed function prototype");
@@ -159,12 +165,12 @@ impl Parser {
         match self.curr_token_type() {
             TokenType::Number(_) => self.parse_number_expr(),
             TokenType::Other('(') => self.parse_paren_expr(),
-            TokenType::Eof => Err(ParseError::unexpected_eof(self.lexer.get_context())
+            TokenType::Eof => Err(ParseError::unexpected_eof(self.lexer.get_context(None, None))
                 .with_pos(self.current_token.pos)
                 .into()),
             token => {
                 return Err(ParseError::no_primary_expression(
-                    self.lexer.get_context(),
+                    self.lexer.get_context(None, None),
                     format!("{}", token),
                 )
                 .with_pos(self.current_token.pos)
@@ -175,7 +181,7 @@ impl Parser {
 
     fn parse_number_expr(&mut self) -> Result<ExprAST> {
         let n = self.get_number_token()?;
-        let result = ExprAST::new_number_expr(n);
+        let result = ExprAST::new_integer_expr(n);
         self.advance_token();
         Ok(result)
     }
@@ -202,7 +208,7 @@ impl Parser {
                 TokenType::Plus => BinOp::Add,
                 _ => {
                     return Err(ParseError::missing_token(
-                        self.lexer.get_context(),
+                        self.lexer.get_context(None, None),
                         "binary operator",
                     )
                     .with_pos(self.current_token.pos)
@@ -226,9 +232,21 @@ impl Parser {
 
     fn get_number_token(&self) -> Result<i32> {
         self.current_token.token_type.number().ok_or_else(|| {
-            ParseError::missing_token(self.lexer.get_context(), "number")
+            ParseError::missing_token(self.lexer.get_context(None, None), "number")
                 .with_pos(self.current_token.pos)
                 .into()
         })
+    }
+
+    fn type_check_function(&self, proto: &PrototypeAST, body: &ExprAST, start: usize, end: usize) -> Result<()> {
+        let fn_ret_type = proto.ty;
+        let body_type = body.type_of();
+
+        if fn_ret_type != body_type {
+            return Err(ParseError::unexpected_type(self.lexer.get_context(Some(start), Some(end)), fn_ret_type.as_str(), body_type.as_str())
+                .with_pos(self.current_token.pos).into());
+        }
+
+        Ok(())
     }
 }

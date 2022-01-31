@@ -1,10 +1,4 @@
 // fn main()
 fn main() -> int {
-    34 + 35;
-}
-
-// fn bar()
-fn bar() -> int {
-    // addition 1 + 2
-    1 + 2;
+    42;
 }

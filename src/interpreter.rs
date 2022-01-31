@@ -44,7 +44,7 @@ impl<'a> Interpreter<'a> {
 
     fn eval_expr(&self, expr: &ExprAST) -> ExprResult {
         match expr {
-            ExprAST::NumberExpr { value } => { ExprResult::Number(*value) }
+            ExprAST::Integer { value } => { ExprResult::Number(*value) }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 match op {
                     BinOp::Add => {
