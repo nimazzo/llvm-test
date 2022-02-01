@@ -24,12 +24,12 @@ impl Default for Formats {
         Self {
             max_desc_len: 20,
             max_seconds: 9999.0,
-            max_seconds_len: 13,
+            max_seconds_len: 11,
             seconds_prec: 5,
             max_millis: 99999999,
-            max_millis_len: 10,
+            max_millis_len: 8,
             max_nanos: 9999999999999,
-            max_nanos_len: 15,
+            max_nanos_len: 13,
             ident: 8,
         }
     }
@@ -104,9 +104,7 @@ impl Timer {
         }
         let secs_format = format!("{:.*}", self.formats.seconds_prec, secs);
         let buffer = self.formats.max_seconds_len - secs_format.len();
-        let left = buffer / 2;
-        let right = buffer - left;
-        format!("{}{}{}", " ".repeat(left), secs_format, " ".repeat(right))
+        format!(" {}{} ", " ".repeat(buffer), secs_format)
     }
 
     fn format_millis(&self, millis: u128) -> String {
@@ -115,9 +113,7 @@ impl Timer {
         }
         let millis_format = millis.to_string();
         let buffer = self.formats.max_millis_len - millis_format.len();
-        let left = buffer / 2;
-        let right = buffer - left;
-        format!("{}{}{}", " ".repeat(left), millis_format, " ".repeat(right))
+        format!(" {}{} ", " ".repeat(buffer), millis_format)
     }
 
     fn format_nanos(&self, nanos: u128) -> String {
@@ -126,9 +122,7 @@ impl Timer {
         }
         let nanos_format = nanos.to_string();
         let buffer = self.formats.max_nanos_len - nanos_format.len();
-        let left = buffer / 2;
-        let right = buffer - left;
-        format!("{}{}{}", " ".repeat(left), nanos_format, " ".repeat(right))
+        format!(" {}{} ", " ".repeat(buffer), nanos_format)
     }
 
     fn header(&self) -> String {
@@ -145,9 +139,9 @@ impl Timer {
             "{}╚{}╩{}╩{}╩{}╝",
             " ".repeat(self.formats.ident),
             "═".repeat(self.formats.max_desc_len),
-            "═".repeat(self.formats.max_seconds_len),
-            "═".repeat(self.formats.max_millis_len),
-            "═".repeat(self.formats.max_nanos_len),
+            "═".repeat(self.formats.max_seconds_len + 2),
+            "═".repeat(self.formats.max_millis_len + 2),
+            "═".repeat(self.formats.max_nanos_len + 2),
         )
     }
 

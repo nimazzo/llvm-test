@@ -98,7 +98,6 @@ struct Cli {
         help = "Interprets the program without compiling",
         conflicts_with("run"),
         conflicts_with("print-ir"),
-        conflicts_with("out")
     )]
     interpret: bool,
 
@@ -124,7 +123,6 @@ struct Cli {
         short,
         long,
         help = "Output path for generated files",
-        conflicts_with("interpret"),
         conflicts_with("parse-only")
     )]
     out: Option<PathBuf>,
@@ -361,7 +359,7 @@ fn run_program(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
 
     match output.status.code() {
         Some(code) => console.force_println(format!(
-            "[Compiler] Program exited with status code: {}",
+            "[CMD] Program exited with status code: {}",
             code
         )),
         None => console.force_println("[Compiler] Process terminated by signal"),
