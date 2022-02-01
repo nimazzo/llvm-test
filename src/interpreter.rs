@@ -53,6 +53,10 @@ impl<'a> Interpreter<'a> {
                     }
                 }
             }
+            ExprAST::Sequence { lhs, rhs } => {
+                self.eval_expr(lhs);
+                self.eval_expr(rhs)
+            }
             ExprAST::Nop => { ExprResult::Null }
         }
     }

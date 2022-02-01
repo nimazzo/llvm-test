@@ -27,6 +27,13 @@ macro_rules! parse {
     }};
 }
 
+macro_rules! peek {
+    ($self: ident) => {{
+        skip_whitespace_and_comments!($self);
+        $self.curr_token_type()
+    }};
+}
+
 macro_rules! parse_identifier {
     ($self: ident) => {{
         skip_whitespace_and_comments!($self);
@@ -136,6 +143,7 @@ impl Parser {
         let body = self.parse_function_body()?;
         let context_end = self.lexer.get_token_idx().1.expect("These are always set");
 
+        // todo: move type checking functionality to other procedure
         self.type_check_function(&proto, &body, context_start, context_end)?;
 
         self.console
@@ -192,20 +200,61 @@ impl Parser {
             return Ok(ExprAST::Nop);
         }
 
-        let body = self.parse_expression()?;
-        parse!(self, TokenType::Semicolon)?;
-        parse!(self, TokenType::RightCurly)?;
+        let mut expressions = vec![];
+        loop {
+            let body = self.parse_expression()?;
+            if body.requires_semicolon() {
+                parse!(self, TokenType::Semicolon)?;
+            }
+            expressions.push(body);
+            match peek!(self) {
+                TokenType::RightCurly | TokenType::Eof => break,
+                _ => {},
+            };
+        }
+
+        let body = self.parse_sequence(expressions)?;
+
+        if body.requires_semicolon() {
+            parse!(self, TokenType::RightCurly)?;
+        }
         self.console
             .println_verbose("[Parser] Successfully parsed function body");
         Ok(body)
+    }
+
+    fn parse_sequence(&self, mut expressions: Vec<ExprAST>) -> Result<ExprAST> {
+        match expressions.len() {
+            0 => panic!("[CRITICAL ERROR] This is a compiler error and should never happen!"),
+            1 => Ok(expressions.remove(0)),
+            _ => {
+                let first = expressions.remove(0);
+                let second = self.parse_sequence(expressions)?;
+                Ok(ExprAST::new_sequence(Box::new(first), Box::new(second)))
+            }
+        }
     }
 
     fn parse_top_level_expression(&mut self) -> Result<FunctionAST> {
         skip_whitespace_and_comments!(self);
         self.console
             .println_verbose("[Parser] Trying to parse top level expression");
-        let body = self.parse_expression()?;
-        parse!(self, TokenType::Semicolon)?;
+
+        let mut expressions = vec![];
+        loop {
+            let body = self.parse_expression()?;
+            if body.requires_semicolon() {
+                parse!(self, TokenType::Semicolon)?;
+            }
+            expressions.push(body);
+            match peek!(self) {
+                TokenType::Eof | TokenType::Fn => break,
+                _ => {}
+            }
+        }
+
+        let body = self.parse_sequence(expressions)?;
+
         let proto = PrototypeAST::new(ANONYMOUS_FUNCTION_NAME.into(), vec![], ExprType::Void);
         self.console
             .println_verbose("[Parser] Successfully parsed top level expression");

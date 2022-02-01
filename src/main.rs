@@ -87,7 +87,8 @@ struct Cli {
         long,
         help = "Only parse source file, don't compile to native code",
         conflicts_with("run"),
-        conflicts_with("out")
+        conflicts_with("out"),
+        conflicts_with("print-ir")
     )]
     parse_only: bool,
 
@@ -108,7 +109,8 @@ struct Cli {
         long,
         help = "Print the LLVM IR code",
         conflicts_with("interpret"),
-        conflicts_with("quiet")
+        conflicts_with("quiet"),
+        conflicts_with("parse-only")
     )]
     print_ir: bool,
 
@@ -200,6 +202,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    // Option --parse-only
+    if cli.parse_only {
+        display_timer!(timer, cli.time);
+        return Ok(());
+    }
+
     // Turn AST into LLVM IR
     start_timer!(timer, "LLVM IR Generation", cli.time);
     let mut compiler = Compiler::new()?;
@@ -224,12 +232,6 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // Option --parse-only
-    if cli.parse_only {
-        display_timer!(timer, cli.time);
-        return Ok(());
-    }
-
     let out_path = create_output_path(&cli)?;
 
     // Native Code Compilation
@@ -249,6 +251,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         stop_timer!(timer, cli.time);
     }
 
+    display_timer!(timer, cli.time);
     Ok(())
 }
 

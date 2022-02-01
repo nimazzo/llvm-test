@@ -1,4 +1,4 @@
-use crate::ast::{ASTPrimitive, BinOp, ExprAST, AST, PrototypeAST, ExprType};
+use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, PrototypeAST, AST};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
@@ -8,10 +8,10 @@ use std::collections::HashMap;
 use std::error::Error;
 
 use crate::error::CompileError;
-use anyhow::Result;
-use inkwell::OptimizationLevel;
-use inkwell::types::BasicMetadataTypeEnum;
 use crate::program::{CompiledFunction, CompiledProgram, ProgramBuilder};
+use anyhow::Result;
+use inkwell::types::BasicMetadataTypeEnum;
+use inkwell::OptimizationLevel;
 
 #[allow(dead_code)]
 pub struct Compiler<'ctx> {
@@ -59,7 +59,9 @@ impl<'ctx> Compiler<'ctx> {
             };
 
             let mut function = CompiledFunction::new(fun.get_name().to_str()?.to_string(), ty);
-            params.iter().cloned().for_each(|arg| { function.add_argument(arg.0, arg.1); });
+            params.iter().cloned().for_each(|arg| {
+                function.add_argument(arg.0, arg.1);
+            });
             program_builder.add_function(function);
         }
         let code = self.module.write_bitcode_to_memory();
@@ -71,18 +73,26 @@ impl<'ctx> Compiler<'ctx> {
         let name = &proto.name;
         let args = &proto.args;
 
-        let args_types = args.iter().map(|(_, ty)| {
-            match ty {
-                ExprType::String => { unimplemented!("Strings are not implemented yet") }
-                ExprType::Integer => { self.context.i32_type() }
-                ExprType::Void => { unreachable!("Function arguments can't have void type") }
-            }
-        }).map(|ty| ty.into()).collect::<Vec<BasicMetadataTypeEnum>>();
+        let args_types = args
+            .iter()
+            .map(|(_, ty)| match ty {
+                ExprType::String => {
+                    unimplemented!("Strings are not implemented yet")
+                }
+                ExprType::Integer => self.context.i32_type(),
+                ExprType::Void => {
+                    unreachable!("Function arguments can't have void type")
+                }
+            })
+            .map(|ty| ty.into())
+            .collect::<Vec<BasicMetadataTypeEnum>>();
 
         let fn_type = match &proto.ty {
-            ExprType::String => { unimplemented!("Strings are not implemented yet") }
-            ExprType::Integer => { self.context.i32_type().fn_type(&args_types, false) }
-            ExprType::Void => { self.context.void_type().fn_type(&args_types, false) }
+            ExprType::String => {
+                unimplemented!("Strings are not implemented yet")
+            }
+            ExprType::Integer => self.context.i32_type().fn_type(&args_types, false),
+            ExprType::Void => self.context.void_type().fn_type(&args_types, false),
         };
 
         let fn_val = self.module.add_function(name, fn_type, None);
@@ -115,15 +125,13 @@ impl<'ctx> Compiler<'ctx> {
         }
 
         // compile function body
-        // todo: improve this nested if-else expression
-        if let Some(body) =  self.compile_expr(body) {
-            if proto.ty != ExprType::Void {
+        match self.compile_expr(body) {
+            Some(body) if proto.ty != ExprType::Void => {
                 self.builder.build_return(Some(&body));
-            } else {
+            }
+            _ => {
                 self.builder.build_return(None);
             }
-        } else {
-            self.builder.build_return(None);
         }
 
         // reset fn specific fields to default
@@ -162,9 +170,14 @@ impl<'ctx> Compiler<'ctx> {
     fn compile_expr(&self, expr: &ExprAST) -> Option<BasicValueEnum<'ctx>> {
         let value = match expr {
             ExprAST::Integer(value) => {
-                self.context.i32_type().const_int(*value as u64, false).into() // todo: maybe change this to true?
+                self.context
+                    .i32_type()
+                    .const_int(*value as u64, false) // todo: maybe change this to true?
+                    .into()
             }
-            ExprAST::String(_) => { unimplemented!("Strings are not implemented yet") }
+            ExprAST::String(_) => {
+                unimplemented!("Strings are not implemented yet")
+            }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 let t1 = lhs.type_of();
                 let t2 = lhs.type_of();
@@ -173,15 +186,21 @@ impl<'ctx> Compiler<'ctx> {
                 let rhs = self.compile_expr(rhs)?;
 
                 match op {
-                    BinOp::Add => {
-                        match (lhs, rhs) {
-                            (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
-                                self.builder.build_int_add(v1, v2, "tmpadd").into()
-                            }
-                            _ => unimplemented!("BinOp::Add not implemented for {} and {}", t1.as_str(), t2.as_str()),
+                    BinOp::Add => match (lhs, rhs) {
+                        (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
+                            self.builder.build_int_add(v1, v2, "tmpadd").into()
                         }
+                        _ => unimplemented!(
+                            "BinOp::Add not implemented for {} and {}",
+                            t1.as_str(),
+                            t2.as_str()
+                        ),
                     },
                 }
+            }
+            ExprAST::Sequence { lhs, rhs } => {
+                self.compile_expr(lhs)?;
+                self.compile_expr(rhs)?
             }
             ExprAST::Nop => {
                 // self.context.i32_type().const_int(0, false)

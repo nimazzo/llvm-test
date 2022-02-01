@@ -64,6 +64,10 @@ pub enum ExprAST {
         lhs: Box<ExprAST>,
         rhs: Box<ExprAST>,
     },
+    Sequence {
+        lhs: Box<ExprAST>,
+        rhs: Box<ExprAST>,
+    },
     Nop,
 }
 
@@ -72,12 +76,27 @@ impl ExprAST {
         Self::BinaryExpr { op, lhs, rhs }
     }
 
+    pub fn new_sequence(lhs: Box<ExprAST>, rhs: Box<ExprAST>) -> Self {
+        Self::Sequence { lhs, rhs }
+    }
+
     pub fn type_of(&self) -> ExprType {
         match self {
             ExprAST::Integer(_) => ExprType::Integer,
             ExprAST::String(_) => ExprType::String,
             ExprAST::BinaryExpr { op, lhs, rhs } => op.type_of(lhs, rhs),
+            ExprAST::Sequence { rhs, .. } => rhs.type_of(),
             ExprAST::Nop => ExprType::Void,
+        }
+    }
+
+    pub fn requires_semicolon(&self) -> bool {
+        match self {
+            ExprAST::Integer(_) => true,
+            ExprAST::String(_) => true,
+            ExprAST::BinaryExpr { .. } => true,
+            ExprAST::Sequence { rhs, .. } => rhs.requires_semicolon(),
+            ExprAST::Nop => false,
         }
     }
 }
@@ -97,6 +116,7 @@ impl BinOp {
                 if ltype == rtype {
                     ltype
                 } else {
+                    // todo: type check
                     panic!("Type mismatch, handle this later");
                 }
             }

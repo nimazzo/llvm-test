@@ -1,10 +1,13 @@
 // fn main()
 fn main() -> int {
-    42;
+    35 + 34;
+    666;
 }
 
 // fn bar() -> String {
 //     "Hello, World!";
 // }
 
-24 + 33;
+1 + 2;
+44;
+2323 + 21;
