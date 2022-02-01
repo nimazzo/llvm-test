@@ -20,7 +20,7 @@ impl Token {
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Eof,
-    Number(i32),
+    Integer(i32),
     Plus,
     Fn,
     Identifier(String),
@@ -40,7 +40,7 @@ impl Display for TokenType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             TokenType::Eof => f.write_str("<EOF>"),
-            TokenType::Number(n) => f.write_str(&format!("Number('{}')", *n)),
+            TokenType::Integer(n) => f.write_str(&format!("Integer('{}')", *n)),
             TokenType::Plus => f.write_str("Plus('+')"),
             TokenType::Fn => f.write_str("Fn"),
             TokenType::Identifier(id) => f.write_str(&format!("Identifier('{}')", id)),
@@ -59,17 +59,10 @@ impl Display for TokenType {
 }
 
 impl TokenType {
-    pub fn number(&self) -> Option<i32> {
-        match self {
-            TokenType::Number(n) => Some(*n),
-            _ => None,
-        }
-    }
-
     pub fn as_str(&self) -> String {
         match self {
             TokenType::Eof => "".to_string(),
-            TokenType::Number(n) => n.to_string(),
+            TokenType::Integer(n) => n.to_string(),
             TokenType::Plus => "+".to_string(),
             TokenType::Fn => "fn".to_string(),
             TokenType::Identifier(id) => id.clone(),

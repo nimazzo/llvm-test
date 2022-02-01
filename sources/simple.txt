@@ -2,3 +2,9 @@
 fn main() -> int {
     42;
 }
+
+// fn bar() -> String {
+//     "Hello, World!";
+// }
+
+24 + 33;

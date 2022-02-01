@@ -95,6 +95,7 @@ impl<'ctx> Compiler<'ctx> {
         Ok(fn_val)
     }
 
+    // todo: add support for multiple statements in function body
     fn compile_fn(&mut self, proto: &PrototypeAST, body: &ExprAST) -> Result<FunctionValue<'ctx>> {
         let function = self.compile_fn_prototype(proto)?;
 
@@ -110,17 +111,24 @@ impl<'ctx> Compiler<'ctx> {
             let alloca = self.create_entry_block_alloca(&arg_name.0);
 
             self.builder.build_store(alloca, arg);
-
-            // todo: when to remove them?
             self.variables.insert(arg_name.0.clone(), alloca);
         }
 
         // compile function body
+        // todo: improve this nested if-else expression
         if let Some(body) =  self.compile_expr(body) {
-            self.builder.build_return(Some(&body));
+            if proto.ty != ExprType::Void {
+                self.builder.build_return(Some(&body));
+            } else {
+                self.builder.build_return(None);
+            }
         } else {
             self.builder.build_return(None);
         }
+
+        // reset fn specific fields to default
+        self.curr_fn = None;
+        self.variables.clear();
 
         if function.verify(true) {
             Ok(function)

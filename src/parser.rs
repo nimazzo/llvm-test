@@ -10,7 +10,7 @@ const ANONYMOUS_FUNCTION_NAME: &str = "anonymous";
 
 macro_rules! parse {
     ($self: ident, $tk: path) => {{
-        skip_whitespace!($self);
+        skip_whitespace_and_comments!($self);
 
         match $self.curr_token_type() {
             $tk => {
@@ -29,7 +29,7 @@ macro_rules! parse {
 
 macro_rules! parse_identifier {
     ($self: ident) => {{
-        skip_whitespace!($self);
+        skip_whitespace_and_comments!($self);
 
         match $self.curr_token_type() {
             TokenType::Identifier(id) => {
@@ -48,7 +48,7 @@ macro_rules! parse_identifier {
 
 macro_rules! peek_identifier {
     ($self: ident) => {{
-        skip_whitespace!($self);
+        skip_whitespace_and_comments!($self);
 
         match $self.curr_token_type() {
             TokenType::Identifier(id) => Ok(id),
@@ -62,10 +62,14 @@ macro_rules! peek_identifier {
     }};
 }
 
-macro_rules! skip_whitespace {
+macro_rules! skip_whitespace_and_comments {
     ($self: ident) => {{
-        while let TokenType::Whitespace(_) = $self.curr_token_type() {
-            $self.advance_token();
+        loop {
+            match $self.curr_token_type() {
+                TokenType::Whitespace(_) => $self.advance_token(),
+                TokenType::Comment(_) => $self.advance_token(),
+                _ => break,
+            };
         }
     }};
 }
@@ -162,6 +166,7 @@ impl Parser {
         self.console
             .println_verbose("[Parser] Successfully parsed function prototype");
 
+        // todo: Move type checking to procedure over AST
         if function_name == "main" && ret_type != ExprType::Integer {
             return Err(ParseError::unexpected_type(
                 self.lexer.get_context(idx),
@@ -196,6 +201,7 @@ impl Parser {
     }
 
     fn parse_top_level_expression(&mut self) -> Result<FunctionAST> {
+        skip_whitespace_and_comments!(self);
         self.console
             .println_verbose("[Parser] Trying to parse top level expression");
         let body = self.parse_expression()?;
@@ -212,12 +218,11 @@ impl Parser {
     }
 
     fn parse_primary(&mut self) -> Result<ExprAST> {
+        skip_whitespace_and_comments!(self);
         match self.curr_token_type() {
-            TokenType::Number(_) => self.parse_number_expr(),
+            TokenType::Integer(n) => self.parse_integer_expr(n),
             TokenType::DoubleQuotes => self.parse_string(),
             TokenType::Other('(') => self.parse_paren_expr(),
-            TokenType::Comment(_) => self.skip_token(),
-            TokenType::Whitespace(_) => self.skip_token(),
             TokenType::Eof => Err(ParseError::unexpected_eof(
                 self.lexer.get_context((None, None)),
                 here!(),
@@ -234,11 +239,6 @@ impl Parser {
                 .into());
             }
         }
-    }
-
-    fn skip_token(&mut self) -> Result<ExprAST> {
-        self.advance_token();
-        self.parse_primary()
     }
 
     fn parse_string(&mut self) -> Result<ExprAST> {
@@ -267,8 +267,7 @@ impl Parser {
         Ok(ExprAST::String(result))
     }
 
-    fn parse_number_expr(&mut self) -> Result<ExprAST> {
-        let n = self.get_number_token()?;
+    fn parse_integer_expr(&mut self, n: i32) -> Result<ExprAST> {
         let result = ExprAST::Integer(n);
         self.advance_token();
         Ok(result)
@@ -284,6 +283,8 @@ impl Parser {
     fn parse_binop_rhs(&mut self, expr_prec: i32, mut lhs: ExprAST) -> Result<ExprAST> {
         // if this is a binary operation, find its precedence
         loop {
+            skip_whitespace_and_comments!(self);
+
             let token_prec = token::get_token_precedence(&self.current_token);
 
             // If this is a binop that binds at least as tightly as the current binop,
@@ -310,6 +311,7 @@ impl Parser {
             // Parse the primary expression after the binary operator.
             let mut rhs = self.parse_primary()?;
 
+            skip_whitespace_and_comments!(self);
             let next_prec = token::get_token_precedence(&self.current_token);
             if token_prec < next_prec {
                 rhs = self.parse_binop_rhs(token_prec + 1, rhs)?;
@@ -317,14 +319,6 @@ impl Parser {
 
             lhs = ExprAST::new_binary_expr(binop, Box::new(lhs), Box::new(rhs));
         }
-    }
-
-    fn get_number_token(&self) -> Result<i32> {
-        self.current_token.token_type.number().ok_or_else(|| {
-            ParseError::missing_token(self.lexer.get_context((None, None)), "number", here!())
-                .with_pos(self.current_token.pos)
-                .into()
-        })
     }
 
     fn type_check_function(
@@ -337,6 +331,7 @@ impl Parser {
         let fn_ret_type = proto.ty;
         let body_type = body.type_of();
 
+        // todo: Move type checking to procedure over AST
         if fn_ret_type != body_type {
             return Err(ParseError::unexpected_type(
                 self.lexer.get_context((Some(start), Some(end))),

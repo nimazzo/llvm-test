@@ -139,7 +139,7 @@ impl Lexer {
                 }
             } else if start.is_ascii_digit() {
                 let number = self.parse_number();
-                Token::new(pos, self.get_token_idx(), TokenType::Number(number))
+                Token::new(pos, self.get_token_idx(), TokenType::Integer(number))
             } else if start == '+' {
                 self.advance_index();
                 Token::new(pos, self.get_token_idx(), TokenType::Plus)

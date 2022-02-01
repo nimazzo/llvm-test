@@ -22,6 +22,7 @@ mod compiler;
 mod error;
 mod interpreter;
 mod lexer;
+mod measurement;
 mod parser;
 mod program;
 mod token;
@@ -33,15 +34,36 @@ macro_rules! here {
     };
 }
 
+macro_rules! start_timer {
+    ($timer: expr, $desc: expr, $time: expr) => {{
+        if $time {
+            $timer.start($desc);
+        }
+    }};
+}
+
+macro_rules! stop_timer {
+    ($timer: expr, $time: expr) => {{
+        if $time {
+            $timer.stop();
+        }
+    }};
+}
+
+macro_rules! display_timer {
+    ($timer: expr, $time: expr) => {{
+        if $time {
+            println!("{}", $timer);
+        }
+    }};
+}
+
 #[derive(clap::Parser)]
-#[clap(
-    name = "Language Compiler",
-    version,
-    about = "Compiles source files",
-)]
+#[clap(name = "Language Compiler", version, about = "Compiles source files")]
 struct Cli {
     #[clap(
         short,
+        long,
         help = "Runs the program after successful compilation",
         conflicts_with("interpret"),
         conflicts_with("parse-only")
@@ -63,7 +85,7 @@ struct Cli {
 
     #[clap(
         long,
-        help = "Only parse source file, don't generate output files",
+        help = "Only parse source file, don't compile to native code",
         conflicts_with("run"),
         conflicts_with("out")
     )]
@@ -71,6 +93,7 @@ struct Cli {
 
     #[clap(
         short,
+        long,
         help = "Interprets the program without compiling",
         conflicts_with("run"),
         conflicts_with("print-ir"),
@@ -83,20 +106,17 @@ struct Cli {
 
     #[clap(
         long,
-        help = "Print the llvm ir code",
+        help = "Print the LLVM IR code",
         conflicts_with("interpret"),
         conflicts_with("quiet")
     )]
     print_ir: bool,
 
-    #[clap(
-        short,
-        long,
-        help = "Delete intermediate files",
-        conflicts_with("interpret"),
-        conflicts_with("parse-only")
-    )]
+    #[clap(short, long, help = "Delete intermediate files")]
     clean: bool,
+
+    #[clap(short, long, help = "Measure time of compilation steps")]
+    time: bool,
 
     #[clap(
         short,
@@ -129,6 +149,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         quiet: cli.quiet,
         verbose: cli.verbose,
     };
+    let mut timer = measurement::Timer::new();
 
     let mut err_app = Cli::into_app();
     err_app.set_bin_name(
@@ -143,6 +164,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             })?,
     );
 
+    // Check if Source file exists
     if !cli.source.exists() {
         err_app
             .error(
@@ -152,72 +174,110 @@ fn run() -> Result<(), Box<dyn Error>> {
             .exit();
     }
 
+    // Read Source File
     let input = std::fs::read_to_string(&cli.source)?;
 
+    // AST Generation: Lexer + Parser
+    start_timer!(timer, "Lexer + Parser", cli.time);
     let lexer = Lexer::new(&input, console);
     let mut parser = parser::Parser::new(lexer, console);
     let ast = parser.parse()?;
+    stop_timer!(timer, cli.time);
 
+    // Option --print-ast
     if cli.print_ast {
         console.println("\n=========== AST ===========");
         console.println(format!("{:#?}", ast));
     }
 
+    // Option -i, --interpret
     if cli.interpret {
+        start_timer!(timer, "Interpreter", cli.time);
         let mut interpreter = Interpreter::new();
         interpreter.run(&ast, console);
+        stop_timer!(timer, cli.time);
+        display_timer!(timer, cli.time);
         return Ok(());
     }
 
+    // Turn AST into LLVM IR
+    start_timer!(timer, "LLVM IR Generation", cli.time);
     let mut compiler = Compiler::new()?;
     let program = compiler.compile(&ast)?;
+    stop_timer!(timer, cli.time);
 
+    // Option --print-ir
     if cli.print_ir {
         let ir = program.get_llvm_ir()?;
         console.println("\n=========== LLVM IR ===========");
         console.println(ir);
     }
 
-    if let Some(cmd) = cli.subcommand {
+    // Subcommands
+    if let Some(cmd) = &cli.subcommand {
         match cmd {
             CliSubcommand::Analyzer { print_functions } => {
-                subcommand::analyzer(&program, print_functions);
+                start_timer!(timer, "Analyzer", cli.time);
+                subcommand::analyzer(&program, *print_functions);
+                stop_timer!(timer, cli.time);
             }
         }
-        return Ok(());
     }
 
+    // Option --parse-only
     if cli.parse_only {
+        display_timer!(timer, cli.time);
         return Ok(());
     }
 
-    let out_path = match cli.out {
+    let out_path = create_output_path(&cli)?;
+
+    // Native Code Compilation
+    start_timer!(timer, "LLVM IR Compilation", cli.time);
+    compile_llvm_ir(&out_path, &program, console)?;
+    stop_timer!(timer, cli.time);
+
+    // Option -c, --clean
+    if cli.clean {
+        cleanup(&out_path, console);
+    }
+
+    // Option -r, --run
+    if cli.run {
+        start_timer!(timer, "Program Execution", cli.time);
+        run_program(&out_path, console)?;
+        stop_timer!(timer, cli.time);
+    }
+
+    Ok(())
+}
+
+fn create_output_path(cli: &Cli) -> Result<PathBuf, Box<dyn Error>> {
+    match &cli.out {
         Some(out_path) => {
             let parent_path = out_path.parent();
             let file_name = PathBuf::from(out_path.file_stem().ok_or_else(|| {
                 CompileError::GenericCompilationError("Invalid output path".into())
             })?);
             if let Some(parent) = parent_path {
-                parent.join(file_name)
+                Ok(parent.join(file_name))
             } else {
-                file_name
+                Ok(file_name)
             }
         }
-        None => cli.source,
-    };
+        None => Ok(cli.source.clone()),
+    }
+}
 
-    create_ir_file(&program, &out_path, console)?;
-    create_bitcode(&program, &out_path, console)?;
+fn compile_llvm_ir(
+    out_path: impl AsRef<Path>,
+    program: &CompiledProgram,
+    console: Console,
+) -> Result<(), Box<dyn Error>> {
+    create_ir_file(program, &out_path, console)?;
+    create_bitcode(program, &out_path, console)?;
     create_obj_file(&out_path, console)?;
     create_executable(&out_path, console)?;
-
-    if cli.clean {
-        cleanup(&out_path, console);
-    }
-
-    if cli.run {
-        run_program(&out_path, console)?;
-    }
 
     Ok(())
 }
@@ -307,6 +367,24 @@ fn run_program(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
     Ok(())
 }
 
+mod subcommand {
+    use crate::{CompiledProgram, Console};
+
+    pub fn analyzer(program: &CompiledProgram, print_functions: bool) {
+        let console = Console::normal();
+        if print_functions {
+            print_functions_(program, console);
+        }
+    }
+
+    fn print_functions_(program: &CompiledProgram, console: Console) {
+        console.println("[Analyzer] Following functions are defined in the program:");
+        for fun in program.functions() {
+            console.println(fun);
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Copy, Clone)]
 pub struct Console {
@@ -332,24 +410,6 @@ impl Console {
         Self {
             quiet: false,
             verbose: true,
-        }
-    }
-}
-
-mod subcommand {
-    use crate::{CompiledProgram, Console};
-
-    pub fn analyzer(program: &CompiledProgram, print_functions: bool) {
-        let console = Console::normal();
-        if print_functions {
-            print_functions_(program, console);
-        }
-    }
-
-    fn print_functions_(program: &CompiledProgram, console: Console) {
-        console.println("[Analyzer] Following functions are defined in the program:");
-        for fun in program.functions() {
-            console.println(fun);
         }
     }
 }
