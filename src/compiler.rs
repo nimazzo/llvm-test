@@ -105,7 +105,6 @@ impl<'ctx> Compiler<'ctx> {
         Ok(fn_val)
     }
 
-    // todo: add support for multiple statements in function body
     fn compile_fn(&mut self, proto: &PrototypeAST, body: &ExprAST) -> Result<FunctionValue<'ctx>> {
         let function = self.compile_fn_prototype(proto)?;
 
