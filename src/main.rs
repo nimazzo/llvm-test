@@ -289,7 +289,7 @@ fn create_ir_file(
     console: Console,
 ) -> Result<()> {
     console.println("[Compiler] Generating IR Code");
-    program.dump_ir(out_path.as_ref().with_extension("ir"))
+    program.dump_ir(out_path.as_ref().with_extension("ll"))
 }
 
 fn create_bitcode(
