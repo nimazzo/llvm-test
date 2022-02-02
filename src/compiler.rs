@@ -3,15 +3,16 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
-use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use std::collections::HashMap;
 use std::error::Error;
 
-use crate::error::CompileError;
+use crate::error::{CompileError, CompileErrorType};
 use crate::program::{CompiledFunction, CompiledProgram, ProgramBuilder};
 use anyhow::Result;
 use inkwell::types::BasicMetadataTypeEnum;
-use inkwell::OptimizationLevel;
+use inkwell::{AddressSpace, OptimizationLevel};
+use crate::here;
 
 #[allow(dead_code)]
 pub struct Compiler<'ctx> {
@@ -21,6 +22,7 @@ pub struct Compiler<'ctx> {
     execution_engine: ExecutionEngine<'ctx>,
 
     variables: HashMap<String, PointerValue<'ctx>>,
+    functions: HashMap<String, PrototypeAST>,
     curr_fn: Option<FunctionValue<'ctx>>,
 }
 
@@ -37,12 +39,15 @@ impl<'ctx> Compiler<'ctx> {
             execution_engine,
 
             variables: HashMap::new(),
+            functions: HashMap::new(),
             curr_fn: None,
         })
     }
 
     pub fn compile(&mut self, ast: &AST) -> Result<CompiledProgram> {
         let mut program_builder = ProgramBuilder::new();
+
+        self.debug_declare_print();
 
         for node in ast {
             let (fun, params, ty) = match node {
@@ -69,7 +74,7 @@ impl<'ctx> Compiler<'ctx> {
         program_builder.build()
     }
 
-    fn compile_fn_prototype(&self, proto: &PrototypeAST) -> Result<FunctionValue<'ctx>> {
+    fn compile_fn_prototype(&mut self, proto: &PrototypeAST) -> Result<FunctionValue<'ctx>> {
         let name = &proto.name;
         let args = &proto.args;
 
@@ -98,10 +103,11 @@ impl<'ctx> Compiler<'ctx> {
         let fn_val = self.module.add_function(name, fn_type, None);
 
         for (i, arg) in fn_val.get_param_iter().enumerate() {
-            assert!(arg.is_int_value(), "function argument was not a int");
-            arg.into_int_value().set_name(&args[i].0);
+            arg.set_name(&args[i].0)
         }
 
+        // add function prototype to map of defined functions
+        self.functions.insert(name.clone(), proto.clone());
         Ok(fn_val)
     }
 
@@ -125,11 +131,15 @@ impl<'ctx> Compiler<'ctx> {
 
         // compile function body
         match self.compile_expr(body) {
-            Some(body) if proto.ty != ExprType::Void => {
+            Ok(body) => {
                 self.builder.build_return(Some(&body));
-            }
-            _ => {
-                self.builder.build_return(None);
+            },
+            Err(e) => {
+                if let Some(CompileError{ error_type: CompileErrorType::VoidReturn, ..}) = e.downcast_ref::<CompileError>() {
+                    self.builder.build_return(None);
+                } else {
+                    return Err(e);
+                }
             }
         }
 
@@ -143,7 +153,7 @@ impl<'ctx> Compiler<'ctx> {
             unsafe {
                 function.delete();
             }
-            Err(CompileError::GenericCompilationError("Could not build function".into()).into())
+            Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
         }
     }
 
@@ -166,7 +176,7 @@ impl<'ctx> Compiler<'ctx> {
         builder.build_alloca(self.context.i32_type(), name)
     }
 
-    fn compile_expr(&self, expr: &ExprAST) -> Option<BasicValueEnum<'ctx>> {
+    fn compile_expr(&self, expr: &ExprAST) -> Result<BasicValueEnum<'ctx>> {
         let value = match expr {
             ExprAST::Integer(value) => {
                 self.context
@@ -175,7 +185,44 @@ impl<'ctx> Compiler<'ctx> {
                     .into()
             }
             ExprAST::String(_) => {
-                unimplemented!("Strings are not implemented yet")
+                unimplemented!("Strings are not implemented yet");
+            }
+            ExprAST::Variable { ident, .. } => {
+                match self.variables.get(ident) {
+                    Some(ptr) => {
+                        self.builder.build_load(*ptr, ident)
+                    }
+                    None => {
+                        return Err(CompileError::unknown_variable(ident, here!()).into());
+                    }
+                }
+            }
+            ExprAST::FunctionCall { fn_name, args, .. } => {
+                let (internal_fn_name, ret_type) = match self.functions.get(fn_name) {
+                    Some(proto) => (&proto.name, &proto.ty),
+                    None => {
+                        return Err(CompileError::unknown_function(fn_name, here!()).into());
+                    }
+                };
+                let fun = self.module.get_function(internal_fn_name).expect("[CRITICAL ERROR] Internal Compiler Error");
+
+                // Compile function call arguments
+                let mut compiled_args = Vec::with_capacity(args.len());
+                for arg in args {
+                    compiled_args.push(self.compile_expr(arg)?);
+                }
+                let argsv: Vec<BasicMetadataValueEnum> = compiled_args
+                    .iter().by_ref().map(|&val| val.into()).collect();
+
+                // Build function call
+                let call = self.builder.build_call(fun, &argsv, "tmp");
+                match ret_type {
+                    ExprType::String => { unimplemented!("Strings are not implemented yet"); }
+                    ExprType::Integer => call.try_as_basic_value().left().expect("[CRITICAL ERROR] Internal Compiler Error"),
+                    ExprType::Void => {
+                        return Err(CompileError::void_return(here!()).into());
+                    }
+                }
             }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 let t1 = lhs.type_of();
@@ -202,10 +249,16 @@ impl<'ctx> Compiler<'ctx> {
                 self.compile_expr(rhs)?
             }
             ExprAST::Nop => {
-                // self.context.i32_type().const_int(0, false)
-                return None;
+                return Err(CompileError::void_return(here!()).into());
             }
         };
-        Some(value)
+        Ok(value)
+    }
+    fn debug_declare_print(&mut self) {
+        let name = "printf";
+        let i8_ptr = self.context.i8_type().ptr_type(AddressSpace::Generic).into();
+        let fn_type = self.context.i32_type().fn_type(&[i8_ptr], true);
+        self.module.add_function(name, fn_type, None);
+        self.functions.insert("print".into(), PrototypeAST::new("printf".into(), vec![], ExprType::Integer));
     }
 }

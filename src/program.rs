@@ -7,6 +7,7 @@ use inkwell::module::Module;
 use anyhow::Result;
 use crate::ast::ExprType;
 use crate::error::CompileError;
+use crate::here;
 
 pub struct CompiledProgram {
     functions: Vec<CompiledFunction>,
@@ -28,7 +29,7 @@ impl CompiledProgram {
         let context = Context::create();
         let res = self.make_module(&context)?.print_to_file(path);
         if let Err(err) = res {
-            return Err(CompileError::GenericCompilationError(err.to_string()).into());
+            return Err(CompileError::generic_compilation_error(&err.to_string(), here!()).into());
         }
         Ok(())
     }
@@ -36,14 +37,14 @@ impl CompiledProgram {
     pub fn dump_bc<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let context = Context::create();
         if !self.make_module(&context)?.write_bitcode_to_path(path.as_ref()) {
-            return Err(CompileError::GenericCompilationError("Could not write bitcode to file".into()).into());
+            return Err(CompileError::generic_compilation_error("Could not write bitcode to file", here!()).into());
         }
         Ok(())
     }
 
     fn make_module<'ctx>(&self, context: &'ctx Context) -> Result<Module<'ctx>> {
         Module::parse_bitcode_from_buffer(&self.bitcode, context)
-            .map_err(|err| CompileError::JITCompilationError(err.to_string()).into())
+            .map_err(|err| CompileError::jit_compilation_error(&err.to_string(), here!()).into())
     }
 }
 
@@ -71,7 +72,7 @@ impl ProgramBuilder {
     }
 
     pub fn build(self) -> Result<CompiledProgram> {
-        let buffer = self.bitcode.ok_or_else(|| CompileError::GenericCompilationError("Missing bitcode".into()))?;
+        let buffer = self.bitcode.ok_or_else(|| CompileError::generic_compilation_error("Missing bitcode", here!()))?;
         Ok(CompiledProgram {
             functions: self.functions,
             bitcode: buffer,

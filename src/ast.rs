@@ -3,6 +3,7 @@ use std::fmt::{Debug, Formatter};
 #[allow(clippy::upper_case_acronyms)]
 pub type AST = Vec<ASTPrimitive>;
 
+#[derive(Clone)]
 pub enum ASTPrimitive {
     #[allow(dead_code)]
     Extern(PrototypeAST),
@@ -30,7 +31,7 @@ impl Debug for ASTPrimitive {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PrototypeAST {
     pub name: String,
     pub args: Vec<(String, ExprType)>,
@@ -43,7 +44,7 @@ impl PrototypeAST {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionAST {
     pub proto: PrototypeAST,
     pub body: ExprAST,
@@ -55,10 +56,19 @@ impl FunctionAST {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprAST {
     Integer(i32),
     String(String),
+    Variable {
+        ident: String,
+        ty: Option<ExprType>,
+    },
+    FunctionCall {
+        fn_name: String,
+        args: Vec<ExprAST>,
+        ty: Option<ExprType>,
+    },
     BinaryExpr {
         op: BinOp,
         lhs: Box<ExprAST>,
@@ -80,10 +90,27 @@ impl ExprAST {
         Self::Sequence { lhs, rhs }
     }
 
+    pub fn new_function_call(fn_name: String, args: Vec<ExprAST>, ty: Option<ExprType>) -> Self {
+        Self::FunctionCall {
+            fn_name,
+            args,
+            ty,
+        }
+    }
+
+    pub fn new_variable(ident: String, ty: Option<ExprType>) -> Self {
+        Self::Variable {
+            ident,
+            ty
+        }
+    }
+
     pub fn type_of(&self) -> ExprType {
         match self {
             ExprAST::Integer(_) => ExprType::Integer,
             ExprAST::String(_) => ExprType::String,
+            ExprAST::Variable { ty, .. } => ty.unwrap(),
+            ExprAST::FunctionCall { ty, .. } => ty.unwrap(),
             ExprAST::BinaryExpr { op, lhs, rhs } => op.type_of(lhs, rhs),
             ExprAST::Sequence { rhs, .. } => rhs.type_of(),
             ExprAST::Nop => ExprType::Void,
@@ -94,6 +121,8 @@ impl ExprAST {
         match self {
             ExprAST::Integer(_) => true,
             ExprAST::String(_) => true,
+            ExprAST::Variable { .. } => true,
+            ExprAST::FunctionCall { .. } => true,
             ExprAST::BinaryExpr { .. } => true,
             ExprAST::Sequence { rhs, .. } => rhs.requires_semicolon(),
             ExprAST::Nop => false,
@@ -101,7 +130,7 @@ impl ExprAST {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum BinOp {
     Add,
 }
@@ -137,10 +166,8 @@ impl Debug for ExprType {
     }
 }
 
-impl TryFrom<&str> for ExprType {
-    type Error = ();
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+impl ExprType {
+    pub fn from(value: &str) -> Result<Self, ()> {
         match value {
             "String" => Ok(ExprType::String),
             "int" => Ok(ExprType::Integer),

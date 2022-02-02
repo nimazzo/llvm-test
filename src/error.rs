@@ -4,31 +4,82 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub struct ParseError {
-    context: String,
-    error_type: ParseErrorType,
-    location: String,
-    row: Option<usize>,
-    col: Option<usize>,
+    pub context: String,
+    pub error_type: ParseErrorType,
+    pub location: String,
+    pub row: Option<usize>,
+    pub col: Option<usize>,
 }
 
 #[derive(Error, Debug)]
-enum ParseErrorType {
+pub enum ParseErrorType {
     #[error("Missing '{0}' token")]
     MissingToken(String),
     #[error("Not a primary expression: {0}")]
     NoPrimaryExpression(String),
     #[error("Incompatible types: Expected: '{0}' Found: '{1}'")]
     UnexpectedType(String, String),
+    #[error("Unknown type: '{0}'")]
+    UnknownType(String),
     #[error("Unexpected end of file")]
     UnexpectedEOF,
 }
 
 #[derive(Error, Debug)]
-pub enum CompileError {
+pub struct CompileError {
+    pub error_type: CompileErrorType,
+    pub location: String,
+}
+
+#[derive(Error, Debug)]
+pub enum CompileErrorType {
     #[error("Unable to compile program: {0}")]
     GenericCompilationError(String),
     #[error("Unable to JIT compile function: {0}")]
     JITCompilationError(String),
+    #[error("Unknown variable: {0}")]
+    UnknownVariable(String),
+    #[error("Unknown Function: {0}")]
+    UnknownFunction(String),
+    #[error("This is not an error, just an internal marker")]
+    VoidReturn,
+}
+
+impl CompileError {
+    pub fn generic_compilation_error(msg: &str, location: String) -> Self {
+        Self {
+            error_type: CompileErrorType::GenericCompilationError(msg.to_string()),
+            location
+        }
+    }
+
+    pub fn jit_compilation_error(msg: &str, location: String) -> Self {
+        Self {
+            error_type: CompileErrorType::JITCompilationError(msg.to_string()),
+            location
+        }
+    }
+
+    pub fn unknown_variable(msg: &str, location: String) -> Self {
+        Self {
+            error_type: CompileErrorType::UnknownVariable(msg.to_string()),
+            location
+        }
+    }
+
+    pub fn unknown_function(msg: &str, location: String) -> Self {
+        Self {
+            error_type: CompileErrorType::UnknownFunction(msg.to_string()),
+            location
+        }
+    }
+
+    pub fn void_return(location: String) -> Self {
+        Self {
+            error_type: CompileErrorType::VoidReturn,
+            location
+        }
+    }
 }
 
 impl ParseError {
@@ -72,6 +123,16 @@ impl ParseError {
         }
     }
 
+    pub fn unknown_type(context: String, t1: &str, location: String) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::UnknownType(t1.into()),
+            location,
+            row: None,
+            col: None
+        }
+    }
+
     pub fn with_pos(mut self, pos: (usize, usize)) -> Self {
         self.row = Some(pos.0);
         self.col = Some(pos.1);
@@ -94,6 +155,15 @@ impl Display for ParseError {
         display.push_str(&Color::Red.paint(format!("{}", self.error_type)).to_string());
         display.push_str(&format!("\n{}", self.context));
 
+        f.write_str(&display)
+    }
+}
+
+impl Display for CompileError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut display = String::new();
+        display.push_str(&Color::Red.paint(format!("CompileError: {} ", self.location)).to_string());
+        display.push_str(&Color::Red.paint(format!("{}", self.error_type)).to_string());
         f.write_str(&display)
     }
 }

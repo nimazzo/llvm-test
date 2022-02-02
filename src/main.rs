@@ -1,4 +1,5 @@
-extern crate core;
+// todo: prevent user from defining illegal identifiers (e.g. duplicate functions or variable called main)
+
 extern crate inkwell;
 
 use crate::compiler::Compiler;
@@ -75,8 +76,6 @@ struct Cli {
         long,
         help = "Disables all compiler output",
         conflicts_with("verbose"),
-        conflicts_with("print-ast"),
-        conflicts_with("print-ir")
     )]
     quiet: bool,
 
@@ -101,14 +100,13 @@ struct Cli {
     )]
     interpret: bool,
 
-    #[clap(long, help = "Print the parsed AST structure", conflicts_with("quiet"))]
+    #[clap(long, help = "Print the parsed AST structure")]
     print_ast: bool,
 
     #[clap(
         long,
         help = "Print the LLVM IR code",
         conflicts_with("interpret"),
-        conflicts_with("quiet"),
         conflicts_with("parse-only")
     )]
     print_ir: bool,
@@ -160,7 +158,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             .and_then(Path::file_name)
             .and_then(OsStr::to_str)
             .ok_or_else(|| {
-                CompileError::GenericCompilationError("Could not get binary name".into())
+                CompileError::generic_compilation_error("Could not get binary name", here!())
             })?,
     );
 
@@ -186,8 +184,8 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     // Option --print-ast
     if cli.print_ast {
-        console.println("\n=========== AST ===========");
-        console.println(format!("{:#?}", ast));
+        console.force_println("\n=========== AST ===========");
+        console.force_println(format!("{:#?}", ast));
     }
 
     // Option -i, --interpret
@@ -215,8 +213,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     // Option --print-ir
     if cli.print_ir {
         let ir = program.get_llvm_ir()?;
-        console.println("\n=========== LLVM IR ===========");
-        console.println(ir);
+        console.force_println("\n=========== LLVM IR ===========");
+        console.force_println(ir);
     }
 
     // Subcommands
@@ -258,7 +256,7 @@ fn create_output_path(cli: &Cli) -> Result<PathBuf, Box<dyn Error>> {
         Some(out_path) => {
             let parent_path = out_path.parent();
             let file_name = PathBuf::from(out_path.file_stem().ok_or_else(|| {
-                CompileError::GenericCompilationError("Invalid output path".into())
+                CompileError::generic_compilation_error("Invalid output path", here!())
             })?);
             if let Some(parent) = parent_path {
                 Ok(parent.join(file_name))
@@ -275,7 +273,7 @@ fn compile_llvm_ir(
     program: &CompiledProgram,
     console: Console,
 ) -> Result<(), Box<dyn Error>> {
-    create_ir_file(program, &out_path, console)?;
+    create_ll_file(program, &out_path, console)?;
     create_bitcode(program, &out_path, console)?;
     create_obj_file(&out_path, console)?;
     create_executable(&out_path, console)?;
@@ -283,7 +281,7 @@ fn compile_llvm_ir(
     Ok(())
 }
 
-fn create_ir_file(
+fn create_ll_file(
     program: &CompiledProgram,
     out_path: impl AsRef<Path>,
     console: Console,
@@ -312,7 +310,7 @@ fn create_obj_file(out_path: impl AsRef<Path>, console: Console) -> Result<Outpu
         .arg(bc_path);
     console.println(format!("[CMD] {:?}", cmd));
     cmd.output()
-        .map_err(|err| CompileError::GenericCompilationError(err.to_string()).into())
+        .map_err(|err| CompileError::generic_compilation_error(&err.to_string(), here!()).into())
 }
 
 fn create_executable(out_path: impl AsRef<Path>, console: Console) -> Result<Output> {
@@ -323,15 +321,15 @@ fn create_executable(out_path: impl AsRef<Path>, console: Console) -> Result<Out
     cmd.arg(obj_path).arg("-o").arg(exe_path);
     console.println(format!("[CMD] {:?}", cmd));
     cmd.output()
-        .map_err(|err| CompileError::GenericCompilationError(err.to_string()).into())
+        .map_err(|err| CompileError::generic_compilation_error(&err.to_string(), here!()).into())
 }
 
 fn cleanup(out_path: impl AsRef<Path>, console: Console) {
-    let ir_file = out_path.as_ref().with_extension("ir");
+    let ll_file = out_path.as_ref().with_extension("ll");
     let bc_file = out_path.as_ref().with_extension("bc");
     let o_file = out_path.as_ref().with_extension("o");
 
-    for file in &[ir_file, bc_file, o_file] {
+    for file in &[ll_file, bc_file, o_file] {
         if file.exists() {
             match std::fs::remove_file(file) {
                 Ok(_) => {
@@ -351,10 +349,10 @@ fn run_program(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
     let mut cmd = Command::new(&exe_path);
     console.println(format!("[CMD] {:?}", cmd));
     let output = cmd.output().map_err(|e| {
-        CompileError::GenericCompilationError(format!(
+        CompileError::generic_compilation_error(&format!(
             "Could not run program '{:?}': {}",
             exe_path, e
-        ))
+        ), here!())
     })?;
 
     match output.status.code() {

@@ -46,6 +46,12 @@ impl<'a> Interpreter<'a> {
         match expr {
             ExprAST::Integer(value) => { ExprResult::Number(*value) }
             ExprAST::String(s) => { ExprResult::String(s.clone()) }
+            ExprAST::Variable { .. } => {
+                unimplemented!("Variables are not implemented yet")
+            }
+            ExprAST::FunctionCall { .. } => {
+                unimplemented!("Function Calls not implemented yet");
+            }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 match op {
                     BinOp::Add => {

@@ -121,6 +121,14 @@ impl Lexer {
                     self.advance_index();
                     return Token::new(pos, self.get_token_idx(), TokenType::Semicolon);
                 }
+                ':' => {
+                    self.advance_index();
+                    return Token::new(pos, self.get_token_idx(), TokenType::Colon);
+                }
+                ',' => {
+                    self.advance_index();
+                    return Token::new(pos, self.get_token_idx(), TokenType::Comma);
+                }
                 '-' => {
                     if self.peek(1) == Some('>') {
                         self.advance_index();

@@ -1,13 +1,9 @@
 // fn main()
-fn main() -> int {
-    35 + 34;
-    666;
+fn bar(num: String) -> int {
+    num;
 }
 
-// fn bar() -> String {
-//     "Hello, World!";
-// }
+fn main() -> int {
+    1234;
+}
 
-1 + 2;
-44;
-2323 + 21;

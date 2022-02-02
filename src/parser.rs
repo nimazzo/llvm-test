@@ -53,6 +53,7 @@ macro_rules! parse_identifier {
     }};
 }
 
+#[allow(unused_macros)]
 macro_rules! peek_identifier {
     ($self: ident) => {{
         skip_whitespace_and_comments!($self);
@@ -136,57 +137,79 @@ impl Parser {
     }
 
     fn parse_function(&mut self) -> Result<FunctionAST> {
-        self.console
-            .println_verbose("[Parser] Trying to parse function");
+        self.console.println_verbose("[Parser] Trying to parse function");
         let proto = self.parse_function_prototype()?;
-        let context_start = self.lexer.get_token_idx().0.expect("These are always set");
         let body = self.parse_function_body()?;
-        let context_end = self.lexer.get_token_idx().1.expect("These are always set");
 
         // todo: move type checking functionality to other procedure
-        self.type_check_function(&proto, &body, context_start, context_end)?;
+        // self.type_check_function(&proto, &body, context_start, context_end)?;
 
-        self.console
-            .println_verbose("[Parser] Successfully parsed function");
+        self.console.println_verbose("[Parser] Successfully parsed function");
         Ok(FunctionAST::new(proto, body))
     }
 
     fn parse_function_prototype(&mut self) -> Result<PrototypeAST> {
-        self.console
-            .println_verbose("[Parser] Trying to parse function prototype");
+        self.console.println_verbose("[Parser] Trying to parse function prototype");
         parse!(self, TokenType::Fn)?;
         let function_name = parse_identifier!(self)?;
-        // todo: parse arguments
-        parse!(self, TokenType::LeftParen)?;
-        parse!(self, TokenType::RightParen)?;
-        parse!(self, TokenType::RightArrow)?;
-        let type_identifier = peek_identifier!(self)?;
 
-        let pos = self.current_token.pos;
-        let idx = self.current_token.idx;
+        // Parse function arguments
+        let function_args = self.parse_function_arguments()?;
 
-        let ret_type = ExprType::try_from(type_identifier.as_str()).map_err(|_| {
-            ParseError::missing_token(self.lexer.get_context((None, None)), "Type", here!())
-                .with_pos(pos)
-        })?;
-
-        self.advance_token(); // eat type token
-        self.console
-            .println_verbose("[Parser] Successfully parsed function prototype");
+        // Parse function return type
+        let ret_type = self.parse_function_return_type()?;
 
         // todo: Move type checking to procedure over AST
-        if function_name == "main" && ret_type != ExprType::Integer {
-            return Err(ParseError::unexpected_type(
-                self.lexer.get_context(idx),
-                "Integer",
-                ret_type.as_str(),
-                here!(),
-            )
-            .with_pos(pos)
-            .into());
-        }
+        // if function_name == "main" && ret_type != ExprType::Integer {
+        //     return Err(ParseError::unexpected_type(
+        //         self.lexer.get_context(idx),
+        //         "Integer",
+        //         ret_type.as_str(),
+        //         here!(),
+        //     )
+        //     .with_pos(pos)
+        //     .into());
+        // }
+        self.console.println_verbose("[Parser] Successfully parsed function prototype");
+        Ok(PrototypeAST::new(function_name, function_args, ret_type))
+    }
 
-        Ok(PrototypeAST::new(function_name, vec![], ret_type))
+    fn parse_function_return_type(&mut self) -> Result<ExprType> {
+        parse!(self, TokenType::RightArrow)?;
+        skip_whitespace_and_comments!(self);
+        let idx = self.current_token.idx;
+        let pos = self.current_token.pos;
+        let type_ident = parse_identifier!(self)?;
+
+        ExprType::from(type_ident.as_str()).map_err(|_| {
+            ParseError::unknown_type(self.lexer.get_context(idx), &type_ident, here!())
+                .with_pos(pos).into()
+        })
+    }
+
+    fn parse_function_arguments(&mut self) -> Result<Vec<(String, ExprType)>> {
+        let mut function_args = vec![];
+        parse!(self, TokenType::LeftParen)?;
+        if peek!(self) != TokenType::RightParen {
+            loop {
+                let arg_name = parse_identifier!(self)?;
+                parse!(self, TokenType::Colon)?;
+                skip_whitespace_and_comments!(self);
+                let idx = self.current_token.idx;
+                let pos = self.current_token.pos;
+                let type_ident = parse_identifier!(self)?;
+                function_args.push((arg_name, ExprType::from(type_ident.as_str())
+                    .map_err(|_| ParseError::unknown_type(self.lexer.get_context(idx), &type_ident, here!())
+                        .with_pos(pos))?));
+                if peek!(self) == TokenType::Comma {
+                    parse!(self, TokenType::Comma)?;
+                } else {
+                    break;
+                }
+            }
+        }
+        parse!(self, TokenType::RightParen)?;
+        Ok(function_args)
     }
 
     fn parse_function_body(&mut self) -> Result<ExprAST> {
@@ -271,6 +294,7 @@ impl Parser {
         match self.curr_token_type() {
             TokenType::Integer(n) => self.parse_integer_expr(n),
             TokenType::DoubleQuotes => self.parse_string(),
+            TokenType::Identifier(_) => self.parse_identifier(),
             TokenType::Other('(') => self.parse_paren_expr(),
             TokenType::Eof => Err(ParseError::unexpected_eof(
                 self.lexer.get_context((None, None)),
@@ -288,6 +312,54 @@ impl Parser {
                 .into());
             }
         }
+    }
+
+    fn parse_identifier(&mut self) -> Result<ExprAST> {
+        let ident = parse_identifier!(self)?;
+        if self.curr_token_type() == TokenType::LeftParen {
+            self.parse_function_call(ident)
+        } else {
+            Ok(ExprAST::new_variable(ident, None))
+        }
+    }
+
+    fn parse_function_call(&mut self, fn_name: String) -> Result<ExprAST> {
+        let call_args = self.parse_call_arguments()?;
+        let fn_call = ExprAST::new_function_call(fn_name, call_args, None);
+        Ok(fn_call)
+    }
+
+    fn parse_call_arguments(&mut self) -> Result<Vec<ExprAST>> {
+        // bar(hello, "wow", eee);
+        let mut call_args = vec![];
+        parse!(self, TokenType::LeftParen)?;
+
+        if peek!(self) != TokenType::RightParen {
+            loop {
+                skip_whitespace_and_comments!(self);
+                let idx = self.current_token.idx;
+                let pos = self.current_token.pos;
+
+                let arg = match self.curr_token_type() {
+                    TokenType::Integer(n) => { self.parse_integer_expr(n)? }
+                    TokenType::Identifier(ident) => { self.parse_variable_expr(ident)? }
+                    TokenType::LeftParen => { self.parse_paren_expr()? }
+                    TokenType::DoubleQuotes => { self.parse_string()? }
+                    _ => {
+                        return Err(ParseError::missing_token(self.lexer.get_context(idx), "Function Call Argument",
+                            here!()).with_pos(pos).into());
+                    }
+                };
+                call_args.push(arg);
+                if peek!(self) == TokenType::Comma {
+                    parse!(self, TokenType::Comma)?;
+                } else {
+                    break;
+                }
+            }
+        }
+        parse!(self, TokenType::RightParen)?;
+        Ok(call_args)
     }
 
     fn parse_string(&mut self) -> Result<ExprAST> {
@@ -318,6 +390,12 @@ impl Parser {
 
     fn parse_integer_expr(&mut self, n: i32) -> Result<ExprAST> {
         let result = ExprAST::Integer(n);
+        self.advance_token();
+        Ok(result)
+    }
+
+    fn parse_variable_expr(&mut self, ident: String) -> Result<ExprAST> {
+        let result = ExprAST::new_variable(ident, None);
         self.advance_token();
         Ok(result)
     }
