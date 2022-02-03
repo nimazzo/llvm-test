@@ -342,7 +342,7 @@ impl Parser {
 
                 let arg = match self.curr_token_type() {
                     TokenType::Integer(n) => { self.parse_integer_expr(n)? }
-                    TokenType::Identifier(ident) => { self.parse_variable_expr(ident)? }
+                    TokenType::Identifier(_) => { self.parse_identifier()? }
                     TokenType::LeftParen => { self.parse_paren_expr()? }
                     TokenType::DoubleQuotes => { self.parse_string()? }
                     _ => {
@@ -390,12 +390,6 @@ impl Parser {
 
     fn parse_integer_expr(&mut self, n: i32) -> Result<ExprAST> {
         let result = ExprAST::Integer(n);
-        self.advance_token();
-        Ok(result)
-    }
-
-    fn parse_variable_expr(&mut self, ident: String) -> Result<ExprAST> {
-        let result = ExprAST::new_variable(ident, None);
         self.advance_token();
         Ok(result)
     }

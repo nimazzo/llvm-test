@@ -322,13 +322,4 @@ impl<'ctx> Compiler<'ctx> {
         let pp = unsafe { self.builder.build_gep(ptr, &[zero, zero], "gep") };
         Ok(BasicValueEnum::from(pp))
     }
-
-    // fn debug_declare_print(&mut self) {
-    //     let name = "printf";
-    //     let i8_ptr = self.context.i8_type().ptr_type(AddressSpace::Generic).into();
-    //     let fn_type = self.context.i32_type().fn_type(&[i8_ptr], true);
-    //     self.module.add_function(name, fn_type, None);
-    //     // todo: vec![] is probably wrong and will lead to error during type checking
-    //     self.functions.insert("print".into(), PrototypeAST::new("printf".into(), vec![], ExprType::Integer).set_internal());
-    // }
 }
