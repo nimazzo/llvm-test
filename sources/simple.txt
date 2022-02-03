@@ -1,13 +1,9 @@
 // fn main()
-fn bar(s: int) -> int {
-    s;
-}
-
-fn baz() -> void {
+fn square(a: int) -> int {
+    a * a;
 }
 
 fn main() -> int {
-    print("5 / 2 =");
-    bar(5 / 2);
+    print("Hello, World");
+    square(3 + 3);
 }
-

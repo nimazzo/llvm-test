@@ -3,16 +3,16 @@ use inkwell::types::BasicMetadataTypeEnum;
 use inkwell::values::FunctionValue;
 use crate::ast::{ExprAST, ExprType, PrototypeAST};
 use crate::{CompileError, Compiler, here};
-use crate::core::InternalFunctions::PrintString;
+use crate::core::InternalFunction::PrintString;
 
 use anyhow::Result;
-use crate::core::ExternalFunctons::Printf;
+use crate::core::ExternalFuncton::Printf;
 
-pub enum InternalFunctions {
+pub enum InternalFunction {
     PrintString,
 }
 
-pub enum ExternalFunctons {
+pub enum ExternalFuncton {
     Printf,
 }
 

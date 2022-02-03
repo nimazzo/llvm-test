@@ -100,6 +100,13 @@ impl ExprAST {
         }
     }
 
+    pub fn set_internal(mut self) -> Self {
+        if let ExprAST::FunctionCall { ref mut internal, .. } = self {
+            *internal = true;
+        }
+        self
+    }
+
     pub fn new_variable(ident: String, ty: Option<ExprType>) -> Self {
         Self::Variable {
             ident,
