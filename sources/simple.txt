@@ -1,9 +1,9 @@
 // fn main()
-fn bar(s: String) -> String {
-    s;
+fn bar(s: int) -> int {
+    print("Bar()");
 }
 
 fn main() -> int {
-    print(bar("Hello, Nico"));
+    bar(222);
 }
 

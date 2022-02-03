@@ -1,5 +1,6 @@
 // todo: prevent user from defining illegal identifiers (e.g. duplicate functions or variable called main)
 // todo: implement escape char in strings (mainly \n)
+// todo: implement print function for integers
 
 extern crate inkwell;
 
