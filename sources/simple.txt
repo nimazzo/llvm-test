@@ -1,9 +1,12 @@
 // fn main()
 fn bar(num: String) -> int {
-    num;
+    print(num);
 }
 
 fn main() -> int {
+    print("Hello how are you?");
+    print("I am fine?");
+    bar("Print from bar()");
     1234;
 }
 

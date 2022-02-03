@@ -41,6 +41,8 @@ pub enum CompileErrorType {
     UnknownVariable(String),
     #[error("Unknown Function: {0}")]
     UnknownFunction(String),
+    #[error("Illegal Type: {0}")]
+    IllegalType(String),
     #[error("This is not an error, just an internal marker")]
     VoidReturn,
 }
@@ -70,6 +72,13 @@ impl CompileError {
     pub fn unknown_function(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::UnknownFunction(msg.to_string()),
+            location
+        }
+    }
+
+    pub fn illegal_type(msg: &str, location: String) -> Self {
+        Self {
+            error_type: CompileErrorType::IllegalType(msg.to_string()),
             location
         }
     }

@@ -36,11 +36,17 @@ pub struct PrototypeAST {
     pub name: String,
     pub args: Vec<(String, ExprType)>,
     pub ty: ExprType,
+    pub internal: bool,
 }
 
 impl PrototypeAST {
     pub fn new(name: String, args: Vec<(String, ExprType)>, ty: ExprType) -> Self {
-        Self { name, args, ty }
+        Self { name, args, ty, internal: false }
+    }
+
+    pub fn set_internal(mut self) -> Self {
+        self.internal = true;
+        self
     }
 }
 

@@ -10,7 +10,7 @@ use std::error::Error;
 use crate::error::{CompileError, CompileErrorType};
 use crate::program::{CompiledFunction, CompiledProgram, ProgramBuilder};
 use anyhow::Result;
-use inkwell::types::BasicMetadataTypeEnum;
+use inkwell::types::{BasicMetadataTypeEnum, BasicTypeEnum};
 use inkwell::{AddressSpace, OptimizationLevel};
 use crate::here;
 
@@ -81,10 +81,8 @@ impl<'ctx> Compiler<'ctx> {
         let args_types = args
             .iter()
             .map(|(_, ty)| match ty {
-                ExprType::String => {
-                    unimplemented!("Strings are not implemented yet")
-                }
-                ExprType::Integer => self.context.i32_type(),
+                ExprType::String => BasicTypeEnum::from(self.context.i8_type().ptr_type(AddressSpace::Generic)),
+                ExprType::Integer => BasicTypeEnum::from(self.context.i32_type()),
                 ExprType::Void => {
                     unreachable!("Function arguments can't have void type")
                 }
@@ -93,9 +91,7 @@ impl<'ctx> Compiler<'ctx> {
             .collect::<Vec<BasicMetadataTypeEnum>>();
 
         let fn_type = match &proto.ty {
-            ExprType::String => {
-                unimplemented!("Strings are not implemented yet")
-            }
+            ExprType::String => self.context.i8_type().ptr_type(AddressSpace::Generic).fn_type(&args_types, false),
             ExprType::Integer => self.context.i32_type().fn_type(&args_types, false),
             ExprType::Void => self.context.void_type().fn_type(&args_types, false),
         };
@@ -122,11 +118,11 @@ impl<'ctx> Compiler<'ctx> {
         self.variables.reserve(proto.args.len());
 
         for (i, arg) in function.get_param_iter().enumerate() {
-            let arg_name = &proto.args[i];
-            let alloca = self.create_entry_block_alloca(&arg_name.0);
+            let (arg_name, arg_type) = &proto.args[i];
+            let alloca = self.create_entry_block_alloca(arg_name, arg_type)?;
 
             self.builder.build_store(alloca, arg);
-            self.variables.insert(arg_name.0.clone(), alloca);
+            self.variables.insert(arg_name.clone(), alloca);
         }
 
         // compile function body
@@ -157,7 +153,7 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn create_entry_block_alloca(&self, name: &str) -> PointerValue<'ctx> {
+    fn create_entry_block_alloca(&self, name: &str, arg_type: &ExprType) -> Result<PointerValue<'ctx>> {
         let builder = self.context.create_builder();
         let entry = self
             .curr_fn
@@ -173,7 +169,14 @@ impl<'ctx> Compiler<'ctx> {
             }
         }
 
-        builder.build_alloca(self.context.i32_type(), name)
+        let arg_type = match arg_type {
+            ExprType::String => BasicTypeEnum::from(self.context.i8_type().ptr_type(AddressSpace::Generic)),
+            ExprType::Integer => BasicTypeEnum::from(self.context.i32_type()),
+            ExprType::Void => {
+                return Err(CompileError::illegal_type("Void Type in Function Argument", here!()).into());
+            }
+        };
+        Ok(builder.build_alloca(arg_type, name))
     }
 
     fn compile_expr(&self, expr: &ExprAST) -> Result<BasicValueEnum<'ctx>> {
@@ -184,9 +187,7 @@ impl<'ctx> Compiler<'ctx> {
                     .const_int(*value as u64, false) // todo: maybe change this to true?
                     .into()
             }
-            ExprAST::String(_) => {
-                unimplemented!("Strings are not implemented yet");
-            }
+            ExprAST::String(s) => self.compile_string(s)?,
             ExprAST::Variable { ident, .. } => {
                 match self.variables.get(ident) {
                     Some(ptr) => {
@@ -198,26 +199,31 @@ impl<'ctx> Compiler<'ctx> {
                 }
             }
             ExprAST::FunctionCall { fn_name, args, .. } => {
-                let (internal_fn_name, ret_type) = match self.functions.get(fn_name) {
-                    Some(proto) => (&proto.name, &proto.ty),
+                let (internal_fn_name, ret_type, is_internal) = match self.functions.get(fn_name) {
+                    Some(proto) => (&proto.name, &proto.ty, proto.internal),
                     None => {
                         return Err(CompileError::unknown_function(fn_name, here!()).into());
                     }
                 };
                 let fun = self.module.get_function(internal_fn_name).expect("[CRITICAL ERROR] Internal Compiler Error");
 
+                let argsv = if is_internal {
+                    self.compile_call_args_internal(internal_fn_name, args)?
+                } else {
+                    self.compile_call_args(args)?
+                };
                 // Compile function call arguments
-                let mut compiled_args = Vec::with_capacity(args.len());
-                for arg in args {
-                    compiled_args.push(self.compile_expr(arg)?);
-                }
-                let argsv: Vec<BasicMetadataValueEnum> = compiled_args
-                    .iter().by_ref().map(|&val| val.into()).collect();
+                // let mut compiled_args = Vec::with_capacity(args.len());
+                // for arg in args {
+                //     compiled_args.push(self.compile_expr(arg)?);
+                // }
+                // let argsv: Vec<BasicMetadataValueEnum> = compiled_args
+                //     .iter().by_ref().map(|&val| val.into()).collect();
 
                 // Build function call
                 let call = self.builder.build_call(fun, &argsv, "tmp");
                 match ret_type {
-                    ExprType::String => { unimplemented!("Strings are not implemented yet"); }
+                    ExprType::String => call.try_as_basic_value().left().expect("[CRITICAL ERROR] Internal Compiler Error"),
                     ExprType::Integer => call.try_as_basic_value().left().expect("[CRITICAL ERROR] Internal Compiler Error"),
                     ExprType::Void => {
                         return Err(CompileError::void_return(here!()).into());
@@ -254,11 +260,47 @@ impl<'ctx> Compiler<'ctx> {
         };
         Ok(value)
     }
+
+    fn compile_call_args_internal(&self, internal_fn_name: &str, args: &[ExprAST]) -> Result<Vec<BasicMetadataValueEnum<'ctx>>> {
+        match internal_fn_name {
+            "printf" => self.compile_call_args_internal_printf(args),
+            _ => Err(CompileError::unknown_function(internal_fn_name, here!()).into()),
+        }
+    }
+
+    fn compile_call_args_internal_printf(&self, args: &[ExprAST]) -> Result<Vec<BasicMetadataValueEnum<'ctx>>> {
+        let fmt_string = "%s\n";
+        let fmt_val = self.compile_string(fmt_string)?;
+        let mut argsv = self.compile_call_args(args)?;
+        argsv.insert(0, BasicMetadataValueEnum::from(fmt_val));
+        Ok(argsv)
+    }
+
+    fn compile_call_args(&self, args: &[ExprAST]) -> Result<Vec<BasicMetadataValueEnum<'ctx>>> {
+        let mut compiled_args = Vec::with_capacity(args.len());
+        for arg in args {
+            compiled_args.push(self.compile_expr(arg)?);
+        }
+        let argsv: Vec<BasicMetadataValueEnum> = compiled_args
+            .iter().by_ref().map(|&val| val.into()).collect();
+        Ok(argsv)
+    }
+
+    fn compile_string(&self, string: &str) -> Result<BasicValueEnum<'ctx>> {
+        let string = self.context.const_string(string.as_bytes(), true);
+        let ptr = self.builder.build_alloca(string.get_type(), "alloc_string");
+        self.builder.build_store(ptr, string);
+
+        let zero = self.context.i8_type().const_zero();
+        let pp = unsafe { self.builder.build_gep(ptr, &[zero, zero], "gep") };
+        Ok(BasicValueEnum::from(pp))
+    }
+
     fn debug_declare_print(&mut self) {
         let name = "printf";
         let i8_ptr = self.context.i8_type().ptr_type(AddressSpace::Generic).into();
         let fn_type = self.context.i32_type().fn_type(&[i8_ptr], true);
         self.module.add_function(name, fn_type, None);
-        self.functions.insert("print".into(), PrototypeAST::new("printf".into(), vec![], ExprType::Integer));
+        self.functions.insert("print".into(), PrototypeAST::new("printf".into(), vec![], ExprType::Integer).set_internal());
     }
 }
