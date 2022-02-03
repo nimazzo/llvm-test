@@ -7,3 +7,7 @@ fn main() -> int {
     print("Hello, World");
     square(3 + 3);
 }
+
+42;
+"42";
+1 + 3;

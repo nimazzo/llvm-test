@@ -190,8 +190,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
 
     // AST Type Checking
     start_timer!(timer, "Type Checker", cli.time);
-    let mut typechecker = TypeChecker::new(console);
-    typechecker.resolve_types(&mut ast)?;
+    let mut type_checker = TypeChecker::new(console);
+    type_checker.run(&mut ast)?;
     stop_timer!(timer, cli.time);
 
     // Option --print-ast

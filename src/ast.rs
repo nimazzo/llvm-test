@@ -115,7 +115,19 @@ impl ExprAST {
         }
     }
 
-    pub fn type_of(&mut self, context: &TypeContext) -> Option<ExprType> {
+    pub fn type_of(&self) -> Option<ExprType> {
+        match self {
+            ExprAST::Integer(_) => Some(ExprType::Integer),
+            ExprAST::String(_) => Some(ExprType::String),
+            ExprAST::Variable { ty, .. } => ty.clone(),
+            ExprAST::FunctionCall { ty, .. } => ty.clone(),
+            ExprAST::BinaryExpr { lhs, .. } => lhs.type_of().clone(),
+            ExprAST::Sequence { rhs, .. } => rhs.type_of().clone(),
+            ExprAST::Nop => Some(ExprType::Void),
+        }
+    }
+
+    pub fn resolve_type(&mut self, context: &TypeContext) -> Option<ExprType> {
         match self {
             ExprAST::Integer(_) => Some(ExprType::Integer),
             ExprAST::String(_) => Some(ExprType::String),
@@ -131,19 +143,19 @@ impl ExprAST {
                 match ty {
                     Some(t) => Some(*t),
                     None => {
-                        context.functions.get(fn_name).map(|t| { *ty = Some(*t); *t })
+                        context.functions.get(fn_name).map(|proto| { *ty = Some(proto.ty); proto.ty })
                     }
                 }
             },
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 match op {
                     BinOp::Add | BinOp::Minus | BinOp::Mul | BinOp::Div => {
-                        lhs.type_of(context).and(rhs.type_of(context))
+                        lhs.resolve_type(context).and(rhs.resolve_type(context))
                     }
                 }
             },
             ExprAST::Sequence { lhs, rhs, .. } => {
-                lhs.type_of(context).and(rhs.type_of(context))
+                lhs.resolve_type(context).and(rhs.resolve_type(context))
             },
             ExprAST::Nop => Some(ExprType::Void),
         }
@@ -205,7 +217,7 @@ impl ExprType {
 }
 
 pub struct TypeContext {
-    pub functions: HashMap<String, ExprType>,
+    pub functions: HashMap<String, PrototypeAST>,
     pub variables: HashMap<String, ExprType>
 }
 
@@ -222,7 +234,7 @@ impl TypeContext {
         self.variables.extend(vars.into_iter());
     }
 
-    pub fn add_functions(&mut self, funs: HashMap<String, ExprType>) {
+    pub fn add_functions(&mut self, funs: HashMap<String, PrototypeAST>) {
         self.functions.extend(funs.into_iter());
     }
 }

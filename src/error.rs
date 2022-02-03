@@ -19,6 +19,8 @@ pub enum ParseErrorType {
     NoPrimaryExpression(String),
     #[error("Incompatible types: Expected: '{0}' Found: '{1}'")]
     UnexpectedType(String, String),
+    #[error("Wrong Argument Count: Expected: '{0}' Found: '{1}'")]
+    WrongArgumentCount(usize, usize),
     #[error("Unknown type: '{0}'")]
     UnknownType(String),
     #[error("Unexpected end of file")]
@@ -145,6 +147,16 @@ impl ParseError {
         Self {
             context,
             error_type: ParseErrorType::UnknownType(t1.into()),
+            location,
+            row: None,
+            col: None
+        }
+    }
+
+    pub fn wrong_argument_count(context: String, expected: usize, found: usize, location: String) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::WrongArgumentCount(expected, found),
             location,
             row: None,
             col: None

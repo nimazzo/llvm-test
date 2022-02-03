@@ -277,6 +277,7 @@ impl Parser {
                 _ => {}
             }
         }
+        expressions.push(ExprAST::Nop);
 
         let body = self.parse_sequence(expressions)?;
 
