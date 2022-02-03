@@ -16,6 +16,22 @@ pub enum ExternalFuncton {
     Printf,
 }
 
+pub fn get_internal_definitions() -> Vec<PrototypeAST> {
+    let mut ast = vec![];
+    let functions = [PrintString]; // !!!Add new Values here!!!
+    for function in functions {
+        match function {
+            PrintString => { ast.push(get_print_string_definition()); }
+        }
+    }
+
+    ast
+}
+
+fn get_print_string_definition() -> PrototypeAST {
+    PrototypeAST::new("print".to_string(), vec![("s".to_string(), ExprType::String)], ExprType::Integer)
+}
+
 pub fn define_external_functions(compiler: &mut Compiler) -> Result<()> {
     let functions = [Printf]; // !!!Add new Values here!!!
     for function in functions {

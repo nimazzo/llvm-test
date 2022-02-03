@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
 #[allow(clippy::upper_case_acronyms)]
@@ -114,15 +115,37 @@ impl ExprAST {
         }
     }
 
-    pub fn type_of(&self) -> ExprType {
+    pub fn type_of(&mut self, context: &TypeContext) -> Option<ExprType> {
         match self {
-            ExprAST::Integer(_) => ExprType::Integer,
-            ExprAST::String(_) => ExprType::String,
-            ExprAST::Variable { ty, .. } => ty.unwrap(),
-            ExprAST::FunctionCall { ty, .. } => ty.unwrap(),
-            ExprAST::BinaryExpr { op, lhs, rhs } => op.type_of(lhs, rhs),
-            ExprAST::Sequence { rhs, .. } => rhs.type_of(),
-            ExprAST::Nop => ExprType::Void,
+            ExprAST::Integer(_) => Some(ExprType::Integer),
+            ExprAST::String(_) => Some(ExprType::String),
+            ExprAST::Variable { ident, ty } => {
+                match ty {
+                    Some(t) => Some(*t),
+                    None => {
+                        context.variables.get(ident).map(|t| { *ty = Some(*t); *t })
+                    }
+                }
+            },
+            ExprAST::FunctionCall { fn_name, ty, .. } => {
+                match ty {
+                    Some(t) => Some(*t),
+                    None => {
+                        context.functions.get(fn_name).map(|t| { *ty = Some(*t); *t })
+                    }
+                }
+            },
+            ExprAST::BinaryExpr { op, lhs, rhs } => {
+                match op {
+                    BinOp::Add | BinOp::Minus | BinOp::Mul | BinOp::Div => {
+                        lhs.type_of(context).and(rhs.type_of(context))
+                    }
+                }
+            },
+            ExprAST::Sequence { lhs, rhs, .. } => {
+                lhs.type_of(context).and(rhs.type_of(context))
+            },
+            ExprAST::Nop => Some(ExprType::Void),
         }
     }
 
@@ -145,19 +168,6 @@ pub enum BinOp {
     Minus,
     Mul,
     Div,
-}
-
-impl BinOp {
-    pub fn type_of(&self, lhs: &ExprAST, rhs: &ExprAST) -> ExprType {
-        let ltype = lhs.type_of();
-        let rtype = rhs.type_of();
-
-        if ltype == rtype {
-            ltype
-        } else {
-            panic!("[CRITICAL ERROR] Internal Compiler Error");
-        }
-    }
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -191,5 +201,28 @@ impl ExprType {
             ExprType::Integer => "int",
             ExprType::Void => "void",
         }
+    }
+}
+
+pub struct TypeContext {
+    pub functions: HashMap<String, ExprType>,
+    pub variables: HashMap<String, ExprType>
+}
+
+impl TypeContext {
+    pub fn new() -> Self {
+        Self {
+            functions: HashMap::new(),
+            variables: HashMap::new()
+        }
+    }
+
+    pub fn add_variables(&mut self, vars: HashMap<String, ExprType>) {
+        self.variables.clear();
+        self.variables.extend(vars.into_iter());
+    }
+
+    pub fn add_functions(&mut self, funs: HashMap<String, ExprType>) {
+        self.functions.extend(funs.into_iter());
     }
 }

@@ -20,6 +20,7 @@ use std::process::{Command, Output};
 use crate::error::CompileError;
 use crate::interpreter::Interpreter;
 use anyhow::Result;
+use crate::typecheck::TypeChecker;
 
 mod ast;
 mod compiler;
@@ -31,6 +32,7 @@ mod measurement;
 mod parser;
 mod program;
 mod token;
+mod typecheck;
 
 #[macro_export]
 macro_rules! here {
@@ -183,7 +185,13 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     start_timer!(timer, "Lexer + Parser", cli.time);
     let lexer = Lexer::new(&input, console);
     let mut parser = parser::Parser::new(lexer, console);
-    let ast = parser.parse()?;
+    let mut ast = parser.parse()?;
+    stop_timer!(timer, cli.time);
+
+    // AST Type Checking
+    start_timer!(timer, "Type Checker", cli.time);
+    let mut typechecker = TypeChecker::new(console);
+    typechecker.resolve_types(&mut ast)?;
     stop_timer!(timer, cli.time);
 
     // Option --print-ast

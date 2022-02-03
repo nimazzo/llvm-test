@@ -432,29 +432,4 @@ impl Parser {
             lhs = ExprAST::new_binary_expr(binop, Box::new(lhs), Box::new(rhs));
         }
     }
-
-    fn type_check_function(
-        &self,
-        proto: &PrototypeAST,
-        body: &ExprAST,
-        start: usize,
-        end: usize,
-    ) -> Result<()> {
-        let fn_ret_type = proto.ty;
-        let body_type = body.type_of();
-
-        // todo: Move type checking to procedure over AST
-        if fn_ret_type != body_type {
-            return Err(ParseError::unexpected_type(
-                self.lexer.get_context((Some(start), Some(end))),
-                fn_ret_type.as_str(),
-                body_type.as_str(),
-                here!(),
-            )
-            .with_pos(self.current_token.pos)
-            .into());
-        }
-
-        Ok(())
-    }
 }
