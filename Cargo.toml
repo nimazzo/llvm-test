@@ -11,3 +11,4 @@ ansi_term = "0.12"
 anyhow = "1"
 thiserror = "1"
 clap = { version = "3", features = ["derive"] }
+backtrace = "0.3"

@@ -1,6 +1,7 @@
 // todo: prevent user from defining illegal identifiers (e.g. duplicate functions or variable called main)
 // todo: implement escape char in strings (mainly \n)
 // todo: implement print function for integers
+// todo: improve compile errors (add context)
 
 extern crate inkwell;
 
@@ -144,8 +145,8 @@ enum CliSubcommand {
     },
 }
 
-fn run() -> Result<(), Box<dyn Error>> {
-    let cli = Cli::parse();
+fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
+
     let console = Console {
         quiet: cli.quiet,
         verbose: cli.verbose,
@@ -457,7 +458,9 @@ impl Console {
 }
 
 fn main() {
-    if let Err(e) = run() {
+    let cli = Cli::parse();
+
+    if let Err(e) = run(cli) {
         eprintln!("{}", e);
         std::process::exit(1);
     }
