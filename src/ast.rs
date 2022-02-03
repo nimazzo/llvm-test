@@ -135,22 +135,20 @@ impl ExprAST {
 #[derive(Debug, Copy, Clone)]
 pub enum BinOp {
     Add,
+    Minus,
+    Mul,
+    Div,
 }
 
 impl BinOp {
     pub fn type_of(&self, lhs: &ExprAST, rhs: &ExprAST) -> ExprType {
-        match self {
-            BinOp::Add => {
-                let ltype = lhs.type_of();
-                let rtype = rhs.type_of();
+        let ltype = lhs.type_of();
+        let rtype = rhs.type_of();
 
-                if ltype == rtype {
-                    ltype
-                } else {
-                    // todo: type check
-                    panic!("Type mismatch, handle this later");
-                }
-            }
+        if ltype == rtype {
+            ltype
+        } else {
+            panic!("[CRITICAL ERROR] Internal Compiler Error");
         }
     }
 }

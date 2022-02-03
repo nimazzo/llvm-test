@@ -129,12 +129,27 @@ impl Lexer {
                     self.advance_index();
                     return Token::new(pos, self.get_token_idx(), TokenType::Comma);
                 }
+                '+' => {
+                    self.advance_index();
+                    return Token::new(pos, self.get_token_idx(), TokenType::Plus);
+                }
                 '-' => {
-                    if self.peek(1) == Some('>') {
+                    return if self.peek(1) == Some('>') {
                         self.advance_index();
                         self.advance_index();
-                        return Token::new(pos, self.get_token_idx(), TokenType::RightArrow);
+                        Token::new(pos, self.get_token_idx(), TokenType::RightArrow)
+                    } else {
+                        self.advance_index();
+                        Token::new(pos, self.get_token_idx(), TokenType::Minus)
                     }
+                }
+                '*' => {
+                    self.advance_index();
+                    return Token::new(pos, self.get_token_idx(), TokenType::Mul);
+                }
+                '/' => {
+                    self.advance_index();
+                    return Token::new(pos, self.get_token_idx(), TokenType::Div);
                 }
                 _ => (),
             }
@@ -148,9 +163,6 @@ impl Lexer {
             } else if start.is_ascii_digit() {
                 let number = self.parse_number();
                 Token::new(pos, self.get_token_idx(), TokenType::Integer(number))
-            } else if start == '+' {
-                self.advance_index();
-                Token::new(pos, self.get_token_idx(), TokenType::Plus)
             } else {
                 self.advance_index();
                 Token::new(pos, self.get_token_idx(), TokenType::Other(start))

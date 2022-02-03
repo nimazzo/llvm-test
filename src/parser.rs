@@ -337,18 +337,7 @@ impl Parser {
 
         if peek!(self) != TokenType::RightParen {
             loop {
-                skip_whitespace_and_comments!(self);
-                let idx = self.current_token.idx;
-                let pos = self.current_token.pos;
-
-                let arg = self.parse_expression().map_err(|_| {
-                    ParseError::missing_token(
-                        self.lexer.get_context(idx),
-                        "Function Call Argument",
-                        here!(),
-                    )
-                    .with_pos(pos)
-                })?;
+                let arg = self.parse_expression()?;
 
                 call_args.push(arg);
                 if peek!(self) == TokenType::Comma {
@@ -415,6 +404,9 @@ impl Parser {
 
             let binop = match peek!(self) {
                 TokenType::Plus => BinOp::Add,
+                TokenType::Minus => BinOp::Minus,
+                TokenType::Mul => BinOp::Mul,
+                TokenType::Div => BinOp::Div,
                 _ => {
                     return Err(ParseError::missing_token(
                         self.lexer.get_context((None, None)),

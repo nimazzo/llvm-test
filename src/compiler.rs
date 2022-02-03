@@ -270,20 +270,13 @@ impl<'ctx> Compiler<'ctx> {
                 }
             }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
-                let expr1 = self.compile_expr(lhs)?;
-                let expr2 = self.compile_expr(rhs)?;
-
+                let lhs = self.compile_expr(lhs)?;
+                let rhs = self.compile_expr(rhs)?;
                 match op {
-                    BinOp::Add => match (expr1, expr2) {
-                        (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
-                            self.builder.build_int_add(v1, v2, "tmpadd").into()
-                        }
-                        _ => unimplemented!(
-                            "BinOp::Add not implemented for {} and {}",
-                            lhs.type_of().as_str(),
-                            rhs.type_of().as_str()
-                        ),
-                    },
+                    BinOp::Add => self.compile_add(lhs, rhs),
+                    BinOp::Minus => self.compile_minus(lhs, rhs),
+                    BinOp::Mul => self.compile_mul(lhs, rhs),
+                    BinOp::Div => self.compile_div(lhs, rhs),
                 }
             }
             ExprAST::Sequence { lhs, rhs } => {
@@ -295,6 +288,42 @@ impl<'ctx> Compiler<'ctx> {
             }
         };
         Ok(value)
+    }
+
+    fn compile_add(&self, lhs: BasicValueEnum<'ctx>, rhs: BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+        match (lhs, rhs) {
+            (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
+                self.builder.build_int_add(v1, v2, "tmpadd").into()
+            }
+            _ => panic!("[CRITICAL ERROR] Internal Compiler Error"),
+        }
+    }
+
+    fn compile_minus(&self, lhs: BasicValueEnum<'ctx>, rhs: BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+        match (lhs, rhs) {
+            (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
+                self.builder.build_int_sub(v1, v2, "tmpsub").into()
+            }
+            _ => panic!("[CRITICAL ERROR] Internal Compiler Error"),
+        }
+    }
+
+    fn compile_mul(&self, lhs: BasicValueEnum<'ctx>, rhs: BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+        match (lhs, rhs) {
+            (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
+                self.builder.build_int_mul(v1, v2, "tmpsub").into()
+            }
+            _ => panic!("[CRITICAL ERROR] Internal Compiler Error"),
+        }
+    }
+
+    fn compile_div(&self, lhs: BasicValueEnum<'ctx>, rhs: BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+        match (lhs, rhs) {
+            (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
+                self.builder.build_int_signed_div(v1, v2, "tmpsub").into()
+            }
+            _ => panic!("[CRITICAL ERROR] Internal Compiler Error"),
+        }
     }
 
     fn compile_call_args(&self, args: &[ExprAST]) -> Result<Vec<BasicMetadataValueEnum<'ctx>>> {

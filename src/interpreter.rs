@@ -54,9 +54,10 @@ impl<'a> Interpreter<'a> {
             }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 match op {
-                    BinOp::Add => {
-                        self.eval_add(lhs, rhs)
-                    }
+                    BinOp::Add => self.eval_add(lhs, rhs),
+                    BinOp::Minus => self.eval_minus(lhs, rhs),
+                    BinOp::Mul => self.eval_mul(lhs, rhs),
+                    BinOp::Div => self.eval_div(lhs, rhs),
                 }
             }
             ExprAST::Sequence { lhs, rhs } => {
@@ -78,6 +79,51 @@ impl<'a> Interpreter<'a> {
             _ => {
                 ExprResult::TypeMismatchError(format!("ERROR: Incompatible types: No {:?} implementation for lhs: {:?}, rhs: {:?}",
                 BinOp::Add, lhs_eval, rhs_eval))
+            },
+        }
+    }
+
+    fn eval_minus(&self, lhs: &ExprAST, rhs: &ExprAST) -> ExprResult {
+        let lhs_eval = self.eval_expr(lhs);
+        let rhs_eval = self.eval_expr(rhs);
+
+        match (&lhs_eval, &rhs_eval) {
+            (Number(a), Number(b)) => {
+                ExprResult::Number(a - b)
+            },
+            _ => {
+                ExprResult::TypeMismatchError(format!("ERROR: Incompatible types: No {:?} implementation for lhs: {:?}, rhs: {:?}",
+                                                      BinOp::Minus, lhs_eval, rhs_eval))
+            },
+        }
+    }
+
+    fn eval_mul(&self, lhs: &ExprAST, rhs: &ExprAST) -> ExprResult {
+        let lhs_eval = self.eval_expr(lhs);
+        let rhs_eval = self.eval_expr(rhs);
+
+        match (&lhs_eval, &rhs_eval) {
+            (Number(a), Number(b)) => {
+                ExprResult::Number(a * b)
+            },
+            _ => {
+                ExprResult::TypeMismatchError(format!("ERROR: Incompatible types: No {:?} implementation for lhs: {:?}, rhs: {:?}",
+                                                      BinOp::Mul, lhs_eval, rhs_eval))
+            },
+        }
+    }
+
+    fn eval_div(&self, lhs: &ExprAST, rhs: &ExprAST) -> ExprResult {
+        let lhs_eval = self.eval_expr(lhs);
+        let rhs_eval = self.eval_expr(rhs);
+
+        match (&lhs_eval, &rhs_eval) {
+            (Number(a), Number(b)) => {
+                ExprResult::Number(a / b)
+            },
+            _ => {
+                ExprResult::TypeMismatchError(format!("ERROR: Incompatible types: No {:?} implementation for lhs: {:?}, rhs: {:?}",
+                                                      BinOp::Div, lhs_eval, rhs_eval))
             },
         }
     }

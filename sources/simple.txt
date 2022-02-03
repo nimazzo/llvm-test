@@ -1,14 +1,13 @@
 // fn main()
 fn bar(s: int) -> int {
-    (s + 1);
+    s;
 }
 
 fn baz() -> void {
 }
 
 fn main() -> int {
-    print("Hello, World!");
-    print("How are you?");
-    bar(41);
+    print("5 / 2 =");
+    bar(5 / 2);
 }
 

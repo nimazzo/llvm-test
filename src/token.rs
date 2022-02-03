@@ -22,6 +22,9 @@ pub enum TokenType {
     Eof,
     Integer(i32),
     Plus,
+    Minus,
+    Mul,
+    Div,
     Fn,
     Identifier(String),
     Whitespace(String),
@@ -44,6 +47,9 @@ impl Display for TokenType {
             TokenType::Eof => f.write_str("<EOF>"),
             TokenType::Integer(n) => f.write_str(&format!("Integer('{}')", *n)),
             TokenType::Plus => f.write_str("Plus('+')"),
+            TokenType::Minus => f.write_str("Minus('-')"),
+            TokenType::Mul => f.write_str("Mul('*')"),
+            TokenType::Div => f.write_str("ForwardSlash('/')"),
             TokenType::Fn => f.write_str("Fn"),
             TokenType::Identifier(id) => f.write_str(&format!("Identifier('{}')", id)),
             TokenType::Whitespace(_) => f.write_str("WS"),
@@ -68,6 +74,9 @@ impl TokenType {
             TokenType::Eof => "".to_string(),
             TokenType::Integer(n) => n.to_string(),
             TokenType::Plus => "+".to_string(),
+            TokenType::Minus => "-".to_string(),
+            TokenType::Mul => "*".to_string(),
+            TokenType::Div => "/".to_string(),
             TokenType::Fn => "fn".to_string(),
             TokenType::Identifier(id) => id.clone(),
             TokenType::Whitespace(c) => c.clone(),
@@ -88,6 +97,9 @@ impl TokenType {
     fn get_precedence(&self) -> i32 {
         match self {
             TokenType::Plus => 20,
+            TokenType::Minus => 20,
+            TokenType::Mul => 30,
+            TokenType::Div => 30,
             _ => -1,
         }
     }
