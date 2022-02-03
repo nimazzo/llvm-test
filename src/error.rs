@@ -23,6 +23,8 @@ pub enum ParseErrorType {
     WrongArgumentCount(usize, usize),
     #[error("Unknown type: '{0}'")]
     UnknownType(String),
+    #[error("Illegal Type: {0}")]
+    IllegalType(String),
     #[error("Unexpected end of file")]
     UnexpectedEOF,
 }
@@ -43,8 +45,6 @@ pub enum CompileErrorType {
     UnknownVariable(String),
     #[error("Unknown Function: {0}")]
     UnknownFunction(String),
-    #[error("Illegal Type: {0}")]
-    IllegalType(String),
     #[error("Runtime Error: {0}")]
     RuntimeError(String),
     #[error("This is not an error, just an internal marker")]
@@ -76,13 +76,6 @@ impl CompileError {
     pub fn unknown_function(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::UnknownFunction(msg.to_string()),
-            location
-        }
-    }
-
-    pub fn illegal_type(msg: &str, location: String) -> Self {
-        Self {
-            error_type: CompileErrorType::IllegalType(msg.to_string()),
             location
         }
     }
@@ -147,6 +140,16 @@ impl ParseError {
         Self {
             context,
             error_type: ParseErrorType::UnknownType(t1.into()),
+            location,
+            row: None,
+            col: None
+        }
+    }
+
+    pub fn illegal_type(context: String, desc: &str, location: String) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::IllegalType(desc.to_string()),
             location,
             row: None,
             col: None

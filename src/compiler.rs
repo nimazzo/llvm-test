@@ -16,6 +16,8 @@ use anyhow::Result;
 use inkwell::types::{BasicMetadataTypeEnum, BasicTypeEnum};
 use inkwell::{AddressSpace, OptimizationLevel};
 
+const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
+
 #[allow(dead_code)]
 pub struct Compiler<'ctx> {
     pub context: &'static Context,
@@ -90,7 +92,7 @@ impl<'ctx> Compiler<'ctx> {
                 }
                 ExprType::Integer => BasicTypeEnum::from(self.context.i32_type()),
                 ExprType::Void => {
-                    unreachable!("Function arguments can't have void type")
+                    unreachable!("[CRITICAL ERROR] Function arguments can't have void type")
                 }
             })
             .map(|ty| ty.into())
@@ -202,11 +204,7 @@ impl<'ctx> Compiler<'ctx> {
                 BasicTypeEnum::from(self.context.i8_type().ptr_type(AddressSpace::Generic))
             }
             ExprType::Integer => BasicTypeEnum::from(self.context.i32_type()),
-            ExprType::Void => {
-                return Err(
-                    CompileError::illegal_type("Void Type in Function Argument", here!()).into(),
-                );
-            }
+            _ => unreachable!(INTERNAL_ERROR),
         };
         Ok(builder.build_alloca(arg_type, name))
     }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use anyhow::Result;
-use crate::ast::{AST, ASTPrimitive, BinOp, ExprAST, ExprType, FunctionAST, TypeContext};
+use crate::ast::{AST, ASTPrimitive, BinOp, ExprAST, ExprType, FunctionAST, PrototypeAST, TypeContext};
 use crate::{CompileError, Console, here};
 use crate::error::ParseError;
 
@@ -79,12 +79,27 @@ impl TypeChecker {
     fn check_types(&self, ast: &AST) -> Result<()> {
         self.console.println_verbose("[Type Checker] Starting Type Checking Process");
         for node in ast {
-            if let ASTPrimitive::Function(fun) = node {
-                self.check_expr_types(&fun.body)?;
-                let body_type = fun.body.type_of().expect(INTERNAL_ERROR);
-                if body_type != fun.proto.ty {
-                    return Err(ParseError::unexpected_type("TODO".to_string(), fun.proto.ty.as_str(), body_type.as_str(), here!()).into());
+            match node {
+                ASTPrimitive::Extern(proto) => {
+                    self.check_fn_proto_types(proto)?;
                 }
+                ASTPrimitive::Function(fun) => {
+                    self.check_fn_proto_types(&fun.proto)?;
+                    self.check_expr_types(&fun.body)?;
+                    let body_type = fun.body.type_of().expect(INTERNAL_ERROR);
+                    if body_type != fun.proto.ty {
+                        return Err(ParseError::unexpected_type("TODO".to_string(), fun.proto.ty.as_str(), body_type.as_str(), here!()).into());
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn check_fn_proto_types(&self, proto: &PrototypeAST) -> Result<()> {
+        for (_, arg_type) in &proto.args {
+            if *arg_type == ExprType::Void {
+                return Err(ParseError::illegal_type("TODO".to_string(), "void type not allowed as function arguments", here!()).into());
             }
         }
         Ok(())

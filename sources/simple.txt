@@ -1,11 +1,10 @@
 // fn main()
-fn square(a: int) -> int {
-    a * a;
+fn square(num: int) -> int {
+    num * num;
 }
 
 fn main() -> int {
     print("Hello, World");
-    square(3 + 3);
 }
 
 42;
