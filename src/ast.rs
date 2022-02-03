@@ -119,15 +119,15 @@ impl ExprAST {
         match self {
             ExprAST::Integer(_) => Some(ExprType::Integer),
             ExprAST::String(_) => Some(ExprType::String),
-            ExprAST::Variable { ty, .. } => ty.clone(),
-            ExprAST::FunctionCall { ty, .. } => ty.clone(),
-            ExprAST::BinaryExpr { lhs, .. } => lhs.type_of().clone(),
-            ExprAST::Sequence { rhs, .. } => rhs.type_of().clone(),
+            ExprAST::Variable { ty, .. } => *ty,
+            ExprAST::FunctionCall { ty, .. } => *ty,
+            ExprAST::BinaryExpr { lhs, .. } => lhs.type_of(),
+            ExprAST::Sequence { rhs, .. } => rhs.type_of(),
             ExprAST::Nop => Some(ExprType::Void),
         }
     }
 
-    pub fn resolve_type(&mut self, context: &TypeContext) -> Option<ExprType> {
+    pub fn resolve_type(&mut self, context: &TypeContext, unresolved: &mut usize) -> Option<ExprType> {
         match self {
             ExprAST::Integer(_) => Some(ExprType::Integer),
             ExprAST::String(_) => Some(ExprType::String),
@@ -135,27 +135,52 @@ impl ExprAST {
                 match ty {
                     Some(t) => Some(*t),
                     None => {
-                        context.variables.get(ident).map(|t| { *ty = Some(*t); *t })
+                        match context.variables.get(ident).map(|t| { *ty = Some(*t); *t }) {
+                            Some(t) => Some(t),
+                            None => {
+                                *unresolved += 1;
+                                None
+                            },
+                        }
                     }
                 }
             },
-            ExprAST::FunctionCall { fn_name, ty, .. } => {
+            ExprAST::FunctionCall { fn_name, args, ty, .. } => {
+                let resolved_args = args.iter_mut().filter_map(|arg| {
+                    match arg.resolve_type(context, unresolved) {
+                        Some(t) => Some(t),
+                        None => {
+                            *unresolved += 1;
+                            None
+                        }
+                    }
+                }).count();
+                if resolved_args != args.len() {
+                    return None;
+                }
+
                 match ty {
                     Some(t) => Some(*t),
                     None => {
-                        context.functions.get(fn_name).map(|proto| { *ty = Some(proto.ty); proto.ty })
+                        match context.functions.get(fn_name).map(|proto| { *ty = Some(proto.ty); proto.ty }) {
+                            Some(t) => Some(t),
+                            None => {
+                                *unresolved += 1;
+                                None
+                            }
+                        }
                     }
                 }
             },
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 match op {
                     BinOp::Add | BinOp::Minus | BinOp::Mul | BinOp::Div => {
-                        lhs.resolve_type(context).and(rhs.resolve_type(context))
+                        lhs.resolve_type(context, unresolved).and(rhs.resolve_type(context, unresolved))
                     }
                 }
             },
             ExprAST::Sequence { lhs, rhs, .. } => {
-                lhs.resolve_type(context).and(rhs.resolve_type(context))
+                lhs.resolve_type(context, unresolved).and(rhs.resolve_type(context, unresolved))
             },
             ExprAST::Nop => Some(ExprType::Void),
         }

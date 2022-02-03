@@ -51,15 +51,12 @@ impl TypeChecker {
         }).collect::<Vec<_>>();
 
         self.console.println_verbose(format!("[Type Checker] Found {} Function Definitions", self.context.functions.len()));
-        let mut last_unresolved = unresolved_functions.len();
+        let mut last_unresolved = 0;
         let mut round = 1;
         loop {
-            self.console.println_verbose(format!("[Type Checker] Round {}: {} Unresolved Functions Left", round, last_unresolved));
             let mut unresolved = 0;
             unresolved_functions.iter_mut().for_each(|fun| {
-                if !self.type_check_function(fun) {
-                    unresolved += 1;
-                }
+                self.type_check_function(fun, &mut unresolved);
             });
 
             if unresolved == 0 {
@@ -70,6 +67,7 @@ impl TypeChecker {
                 return Err(CompileError::generic_compilation_error("Infinite Loop during Type Resolving", here!()).into());
             }
             last_unresolved = unresolved;
+            self.console.println_verbose(format!("[Type Checker] Round {}: {} Unresolved Symbols Left", round, last_unresolved));
             round += 1;
         }
         Ok(())
@@ -140,9 +138,9 @@ impl TypeChecker {
         }
     }
 
-    fn type_check_function(&mut self, fun: &mut FunctionAST) -> bool {
+    fn type_check_function(&mut self, fun: &mut FunctionAST, unresolved: &mut usize) -> bool {
         let local_variables = fun.proto.args.iter().cloned().collect::<HashMap<String, ExprType>>();
         self.context.add_variables(local_variables);
-        fun.body.resolve_type(&self.context).is_some()
+        fun.body.resolve_type(&self.context, unresolved).is_some()
     }
 }
