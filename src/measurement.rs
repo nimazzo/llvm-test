@@ -22,7 +22,7 @@ struct Formats {
 impl Default for Formats {
     fn default() -> Self {
         Self {
-            max_desc_len: 20,
+            max_desc_len: 19,
             max_seconds: 9999.0,
             max_seconds_len: 11,
             seconds_prec: 5,
@@ -88,9 +88,7 @@ impl Timer {
             format!("{}..", &desc[..self.formats.max_desc_len - 2])
         } else {
             let buffer = self.formats.max_desc_len - str_len;
-            let left = buffer / 2;
-            let right = buffer - left;
-            format!("{}{}{}", " ".repeat(left), desc, " ".repeat(right))
+            format!(" {}{} ", desc, " ".repeat(buffer))
         };
     }
 
@@ -127,10 +125,10 @@ impl Timer {
 
     fn header(&self) -> String {
         "
-                             Timing Information
-        ╔════════════════════╦═════════════╦══════════╦═══════════════╗
-        ║  Compilation Step  ║   Seconds   ║  Millis  ║     Nanos     ║
-        ╠════════════════════╬═════════════╬══════════╬═══════════════╣"
+                              Timing Information
+        ╔═════════════════════╦═════════════╦══════════╦═══════════════╗
+        ║  Compilation  Step  ║   Seconds   ║  Millis  ║     Nanos     ║
+        ╠═════════════════════╬═════════════╬══════════╬═══════════════╣"
             .to_string()
     }
 
@@ -138,7 +136,7 @@ impl Timer {
         format!(
             "{}╚{}╩{}╩{}╩{}╝",
             " ".repeat(self.formats.ident),
-            "═".repeat(self.formats.max_desc_len),
+            "═".repeat(self.formats.max_desc_len + 2),
             "═".repeat(self.formats.max_seconds_len + 2),
             "═".repeat(self.formats.max_millis_len + 2),
             "═".repeat(self.formats.max_nanos_len + 2),

@@ -22,6 +22,7 @@ use anyhow::Result;
 
 mod ast;
 mod compiler;
+mod core;
 mod error;
 mod interpreter;
 mod lexer;
@@ -29,7 +30,6 @@ mod measurement;
 mod parser;
 mod program;
 mod token;
-mod core;
 
 #[macro_export]
 macro_rules! here {
@@ -78,7 +78,7 @@ struct Cli {
         short,
         long,
         help = "Disables all compiler output",
-        conflicts_with("verbose"),
+        conflicts_with("verbose")
     )]
     quiet: bool,
 
@@ -99,7 +99,7 @@ struct Cli {
         long,
         help = "Interprets the program without compiling",
         conflicts_with("run"),
-        conflicts_with("print-ir"),
+        conflicts_with("print-ir")
     )]
     interpret: bool,
 
@@ -350,20 +350,19 @@ fn run_program(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
     console.println("[Compiler] Executing compiled program");
     let exe_path = out_path.as_ref().with_extension("exe");
     let mut cmd = Command::new(&exe_path);
-    console.println(format!("[CMD] {:?}", cmd));
+    console.println(format!("[CMD] {:?}\n", cmd));
     let output = cmd.output().map_err(|e| {
-        CompileError::generic_compilation_error(&format!(
-            "Could not run program '{:?}': {}",
-            exe_path, e
-        ), here!())
+        CompileError::runtime_error(
+            &format!("Could not run program '{:?}': {}", exe_path, e),
+            here!(),
+        )
     })?;
 
-    match output.status.code() {
-        Some(code) => console.force_println(format!(
-            "[CMD] Program exited with status code: {}",
-            code
-        )),
-        None => console.force_println("[Compiler] Process terminated by signal"),
+    let program_output = String::from_utf8(output.stdout)?;
+    program_output.lines().for_each(|line| console.force_println(format!("[Program] {}", line)));
+
+    if let Some(code) = output.status.code() {
+        console.force_println(format!("\n[CMD] Program exited with status code: {}", code));
     }
 
     Ok(())

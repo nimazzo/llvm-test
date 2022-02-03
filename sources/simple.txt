@@ -1,9 +1,11 @@
 // fn main()
 fn bar(s: int) -> int {
-    print("Bar()");
+    s + 1;
 }
 
 fn main() -> int {
-    bar(222);
+    print("Hello, World!");
+    print("How are you?");
+    bar(68);
 }
 

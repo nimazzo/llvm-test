@@ -270,21 +270,18 @@ impl<'ctx> Compiler<'ctx> {
                 }
             }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
-                let t1 = lhs.type_of();
-                let t2 = lhs.type_of();
-
-                let lhs = self.compile_expr(lhs)?;
-                let rhs = self.compile_expr(rhs)?;
+                let expr1 = self.compile_expr(lhs)?;
+                let expr2 = self.compile_expr(rhs)?;
 
                 match op {
-                    BinOp::Add => match (lhs, rhs) {
+                    BinOp::Add => match (expr1, expr2) {
                         (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
                             self.builder.build_int_add(v1, v2, "tmpadd").into()
                         }
                         _ => unimplemented!(
                             "BinOp::Add not implemented for {} and {}",
-                            t1.as_str(),
-                            t2.as_str()
+                            lhs.type_of().as_str(),
+                            rhs.type_of().as_str()
                         ),
                     },
                 }
