@@ -28,6 +28,7 @@ mod measurement;
 mod parser;
 mod program;
 mod token;
+mod core;
 
 #[macro_export]
 macro_rules! here {
