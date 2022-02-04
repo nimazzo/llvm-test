@@ -60,12 +60,7 @@ impl Lexer {
         }
 
         let mut current_token = String::new();
-        for c in self
-            .input
-            .iter()
-            .skip(start)
-            .take(end - start)
-        {
+        for c in self.input.iter().skip(start).take(end - start) {
             current_token.push(*c);
         }
 
@@ -75,7 +70,10 @@ impl Lexer {
             context.push(*c);
         }
 
-        let context = context.lines().map(|line| format!("    {}\n", line)).collect::<String>();
+        let context = context
+            .lines()
+            .map(|line| format!("    {}\n", line))
+            .collect::<String>();
         context
     }
 
@@ -208,7 +206,7 @@ impl Lexer {
                     Some(self.skip_comment())
                 } else {
                     Some(self.skip_whitespace())
-                }
+                };
             }
         }
         None

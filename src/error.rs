@@ -55,42 +55,42 @@ impl CompileError {
     pub fn generic_compilation_error(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::GenericCompilationError(msg.to_string()),
-            location
+            location,
         }
     }
 
     pub fn jit_compilation_error(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::JITCompilationError(msg.to_string()),
-            location
+            location,
         }
     }
 
     pub fn unknown_variable(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::UnknownVariable(msg.to_string()),
-            location
+            location,
         }
     }
 
     pub fn unknown_function(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::UnknownFunction(msg.to_string()),
-            location
+            location,
         }
     }
 
     pub fn runtime_error(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::RuntimeError(msg.to_string()),
-            location
+            location,
         }
     }
 
     pub fn void_return(location: String) -> Self {
         Self {
             error_type: CompileErrorType::VoidReturn,
-            location
+            location,
         }
     }
 }
@@ -142,7 +142,7 @@ impl ParseError {
             error_type: ParseErrorType::UnknownType(t1.into()),
             location,
             row: None,
-            col: None
+            col: None,
         }
     }
 
@@ -152,17 +152,22 @@ impl ParseError {
             error_type: ParseErrorType::IllegalType(desc.to_string()),
             location,
             row: None,
-            col: None
+            col: None,
         }
     }
 
-    pub fn wrong_argument_count(context: String, expected: usize, found: usize, location: String) -> Self {
+    pub fn wrong_argument_count(
+        context: String,
+        expected: usize,
+        found: usize,
+        location: String,
+    ) -> Self {
         Self {
             context,
             error_type: ParseErrorType::WrongArgumentCount(expected, found),
             location,
             row: None,
-            col: None
+            col: None,
         }
     }
 
@@ -176,7 +181,11 @@ impl ParseError {
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut display = String::new();
-        display.push_str(&Color::Red.paint(format!("ParseError: {} ", self.location)).to_string());
+        display.push_str(
+            &Color::Red
+                .paint(format!("ParseError: {} ", self.location))
+                .to_string(),
+        );
         if let (Some(row), Some(col)) = (self.row, self.col) {
             display.push_str(
                 &Color::Red
@@ -195,7 +204,11 @@ impl Display for ParseError {
 impl Display for CompileError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut display = String::new();
-        display.push_str(&Color::Red.paint(format!("CompileError: {} ", self.location)).to_string());
+        display.push_str(
+            &Color::Red
+                .paint(format!("CompileError: {} ", self.location))
+                .to_string(),
+        );
         display.push_str(&Color::Red.paint(format!("{}", self.error_type)).to_string());
         f.write_str(&display)
     }

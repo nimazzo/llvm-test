@@ -288,7 +288,11 @@ impl<'ctx> Compiler<'ctx> {
         Ok(value)
     }
 
-    fn compile_add(&self, lhs: BasicValueEnum<'ctx>, rhs: BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+    fn compile_add(
+        &self,
+        lhs: BasicValueEnum<'ctx>,
+        rhs: BasicValueEnum<'ctx>,
+    ) -> BasicValueEnum<'ctx> {
         match (lhs, rhs) {
             (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
                 self.builder.build_int_add(v1, v2, "tmpadd").into()
@@ -297,7 +301,11 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn compile_minus(&self, lhs: BasicValueEnum<'ctx>, rhs: BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+    fn compile_minus(
+        &self,
+        lhs: BasicValueEnum<'ctx>,
+        rhs: BasicValueEnum<'ctx>,
+    ) -> BasicValueEnum<'ctx> {
         match (lhs, rhs) {
             (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
                 self.builder.build_int_sub(v1, v2, "tmpsub").into()
@@ -306,7 +314,11 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn compile_mul(&self, lhs: BasicValueEnum<'ctx>, rhs: BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+    fn compile_mul(
+        &self,
+        lhs: BasicValueEnum<'ctx>,
+        rhs: BasicValueEnum<'ctx>,
+    ) -> BasicValueEnum<'ctx> {
         match (lhs, rhs) {
             (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
                 self.builder.build_int_mul(v1, v2, "tmpsub").into()
@@ -315,7 +327,11 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn compile_div(&self, lhs: BasicValueEnum<'ctx>, rhs: BasicValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+    fn compile_div(
+        &self,
+        lhs: BasicValueEnum<'ctx>,
+        rhs: BasicValueEnum<'ctx>,
+    ) -> BasicValueEnum<'ctx> {
         match (lhs, rhs) {
             (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
                 self.builder.build_int_signed_div(v1, v2, "tmpsub").into()

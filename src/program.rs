@@ -1,13 +1,13 @@
-use std::fmt::{Display, Formatter};
-use std::path::Path;
 use inkwell::context::Context;
 use inkwell::memory_buffer::MemoryBuffer;
 use inkwell::module::Module;
+use std::fmt::{Display, Formatter};
+use std::path::Path;
 
-use anyhow::Result;
 use crate::ast::ExprType;
 use crate::error::CompileError;
 use crate::here;
+use anyhow::Result;
 
 pub struct CompiledProgram {
     functions: Vec<CompiledFunction>,
@@ -36,8 +36,15 @@ impl CompiledProgram {
 
     pub fn dump_bc<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let context = Context::create();
-        if !self.make_module(&context)?.write_bitcode_to_path(path.as_ref()) {
-            return Err(CompileError::generic_compilation_error("Could not write bitcode to file", here!()).into());
+        if !self
+            .make_module(&context)?
+            .write_bitcode_to_path(path.as_ref())
+        {
+            return Err(CompileError::generic_compilation_error(
+                "Could not write bitcode to file",
+                here!(),
+            )
+            .into());
         }
         Ok(())
     }
@@ -72,7 +79,9 @@ impl ProgramBuilder {
     }
 
     pub fn build(self) -> Result<CompiledProgram> {
-        let buffer = self.bitcode.ok_or_else(|| CompileError::generic_compilation_error("Missing bitcode", here!()))?;
+        let buffer = self
+            .bitcode
+            .ok_or_else(|| CompileError::generic_compilation_error("Missing bitcode", here!()))?;
         Ok(CompiledProgram {
             functions: self.functions,
             bitcode: buffer,
@@ -93,7 +102,12 @@ pub struct FunctionArgument {
 
 impl Display for CompiledFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let args = self.args.iter().map(|arg| format!("{}: {}", arg.name, arg.ty.as_str())).collect::<Vec<String>>().join(", ");
+        let args = self
+            .args
+            .iter()
+            .map(|arg| format!("{}: {}", arg.name, arg.ty.as_str()))
+            .collect::<Vec<String>>()
+            .join(", ");
         write!(f, "    fn {}({}) -> {}", self.name, args, self.ty.as_str())
     }
 }

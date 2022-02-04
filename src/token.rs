@@ -8,7 +8,11 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(pos: (usize, usize), idx: (Option<usize>, Option<usize>), token_type: TokenType) -> Self {
+    pub fn new(
+        pos: (usize, usize),
+        idx: (Option<usize>, Option<usize>),
+        token_type: TokenType,
+    ) -> Self {
         Self {
             pos,
             idx,

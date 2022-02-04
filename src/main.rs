@@ -19,8 +19,8 @@ use std::process::{Command, Output};
 
 use crate::error::CompileError;
 use crate::interpreter::Interpreter;
-use anyhow::Result;
 use crate::typecheck::TypeChecker;
+use anyhow::Result;
 
 mod ast;
 mod compiler;
@@ -148,7 +148,6 @@ enum CliSubcommand {
 }
 
 fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
-
     let console = Console {
         quiet: cli.quiet,
         verbose: cli.verbose,
@@ -368,7 +367,9 @@ fn run_program(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
     })?;
 
     let program_output = String::from_utf8(output.stdout)?;
-    program_output.lines().for_each(|line| console.force_println(format!("[Program] {}", line)));
+    program_output
+        .lines()
+        .for_each(|line| console.force_println(format!("[Program] {}", line)));
 
     if let Some(code) = output.status.code() {
         console.force_println(format!("\n[CMD] Program exited with status code: {}", code));

@@ -102,17 +102,17 @@ impl ExprAST {
     }
 
     pub fn set_internal(mut self) -> Self {
-        if let ExprAST::FunctionCall { ref mut internal, .. } = self {
+        if let ExprAST::FunctionCall {
+            ref mut internal, ..
+        } = self
+        {
             *internal = true;
         }
         self
     }
 
     pub fn new_variable(ident: String, ty: Option<ExprType>) -> Self {
-        Self::Variable {
-            ident,
-            ty
-        }
+        Self::Variable { ident, ty }
     }
 
     pub fn type_of(&self) -> Option<ExprType> {
@@ -127,34 +127,42 @@ impl ExprAST {
         }
     }
 
-    pub fn resolve_type(&mut self, context: &TypeContext, unresolved: &mut usize) -> Option<ExprType> {
+    pub fn resolve_type(
+        &mut self,
+        context: &TypeContext,
+        unresolved: &mut usize,
+    ) -> Option<ExprType> {
         match self {
             ExprAST::Integer(_) => Some(ExprType::Integer),
             ExprAST::String(_) => Some(ExprType::String),
-            ExprAST::Variable { ident, ty } => {
-                match ty {
-                    Some(t) => Some(*t),
-                    None => {
-                        match context.variables.get(ident).map(|t| { *ty = Some(*t); *t }) {
-                            Some(t) => Some(t),
-                            None => {
-                                *unresolved += 1;
-                                None
-                            },
-                        }
-                    }
-                }
-            },
-            ExprAST::FunctionCall { fn_name, args, ty, .. } => {
-                let resolved_args = args.iter_mut().filter_map(|arg| {
-                    match arg.resolve_type(context, unresolved) {
+            ExprAST::Variable { ident, ty } => match ty {
+                Some(t) => Some(*t),
+                None => {
+                    match context.variables.get(ident).map(|t| {
+                        *ty = Some(*t);
+                        *t
+                    }) {
                         Some(t) => Some(t),
                         None => {
                             *unresolved += 1;
                             None
                         }
                     }
-                }).count();
+                }
+            },
+            ExprAST::FunctionCall {
+                fn_name, args, ty, ..
+            } => {
+                let resolved_args = args
+                    .iter_mut()
+                    .filter_map(|arg| match arg.resolve_type(context, unresolved) {
+                        Some(t) => Some(t),
+                        None => {
+                            *unresolved += 1;
+                            None
+                        }
+                    })
+                    .count();
                 if resolved_args != args.len() {
                     return None;
                 }
@@ -162,7 +170,10 @@ impl ExprAST {
                 match ty {
                     Some(t) => Some(*t),
                     None => {
-                        match context.functions.get(fn_name).map(|proto| { *ty = Some(proto.ty); proto.ty }) {
+                        match context.functions.get(fn_name).map(|proto| {
+                            *ty = Some(proto.ty);
+                            proto.ty
+                        }) {
                             Some(t) => Some(t),
                             None => {
                                 *unresolved += 1;
@@ -171,17 +182,15 @@ impl ExprAST {
                         }
                     }
                 }
+            }
+            ExprAST::BinaryExpr { op, lhs, rhs } => match op {
+                BinOp::Add | BinOp::Minus | BinOp::Mul | BinOp::Div => lhs
+                    .resolve_type(context, unresolved)
+                    .and(rhs.resolve_type(context, unresolved)),
             },
-            ExprAST::BinaryExpr { op, lhs, rhs } => {
-                match op {
-                    BinOp::Add | BinOp::Minus | BinOp::Mul | BinOp::Div => {
-                        lhs.resolve_type(context, unresolved).and(rhs.resolve_type(context, unresolved))
-                    }
-                }
-            },
-            ExprAST::Sequence { lhs, rhs, .. } => {
-                lhs.resolve_type(context, unresolved).and(rhs.resolve_type(context, unresolved))
-            },
+            ExprAST::Sequence { lhs, rhs, .. } => lhs
+                .resolve_type(context, unresolved)
+                .and(rhs.resolve_type(context, unresolved)),
             ExprAST::Nop => Some(ExprType::Void),
         }
     }
@@ -226,7 +235,7 @@ impl ExprType {
             "String" => Ok(ExprType::String),
             "int" => Ok(ExprType::Integer),
             "void" => Ok(ExprType::Void),
-            _ => Err(())
+            _ => Err(()),
         }
     }
 }
@@ -243,14 +252,14 @@ impl ExprType {
 
 pub struct TypeContext {
     pub functions: HashMap<String, PrototypeAST>,
-    pub variables: HashMap<String, ExprType>
+    pub variables: HashMap<String, ExprType>,
 }
 
 impl TypeContext {
     pub fn new() -> Self {
         Self {
             functions: HashMap::new(),
-            variables: HashMap::new()
+            variables: HashMap::new(),
         }
     }
 
