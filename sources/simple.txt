@@ -1,19 +1,9 @@
 // fn main()
-fn square(num: int) -> int {
-    num * num;
-}
-
-fn awa(a: String, b: String) -> int {
-    42;
-}
-
 fn add(a: int, b: int) -> int {
     a + b;
 }
 
 fn main() -> int {
-    // ((2^2)+(3+4))^2
-    // 121
-    square(add(square(2), add(3, 4)));
-    awa("hello", "world");
+    print("This is native code in my own language WOW!");
+    add(40, 2);
 }

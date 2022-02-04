@@ -214,7 +214,7 @@ impl<'ctx> Compiler<'ctx> {
             ExprAST::Integer(value) => {
                 self.context
                     .i32_type()
-                    .const_int(*value as u64, false) // todo: maybe change this to true?
+                    .const_int(*value as u64, true) // todo: maybe change this to true?
                     .into()
             }
             ExprAST::String(s) => self.compile_string(s)?,
