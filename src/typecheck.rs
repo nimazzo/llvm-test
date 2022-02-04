@@ -3,6 +3,7 @@ use crate::ast::{
     AST,
 };
 use crate::error::ParseError;
+use crate::util::optionize;
 use crate::{here, Console, Lexer};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -143,7 +144,6 @@ impl<'a> TypeChecker<'a> {
                     .expect(INTERNAL_ERROR);
 
                 let context = optionize(unresolved_symbol.context);
-                println!("DEBUG: {:#?}", unresolved_symbol);
                 return Err(ParseError::unknown_type(
                     self.lexer.get_context(context),
                     "Cannot resolve type of symbol",
@@ -293,10 +293,6 @@ impl<'a> TypeChecker<'a> {
             .println("[Type Checker] All types successfully resolved");
         Ok(())
     }
-}
-
-fn optionize(context: (usize, usize)) -> (Option<usize>, Option<usize>) {
-    (Some(context.0), Some(context.1))
 }
 
 fn is_resolved(expr: &ExprAST) -> bool {

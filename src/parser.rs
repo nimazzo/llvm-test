@@ -4,6 +4,7 @@ use crate::{token, Console, Lexer, TokenType};
 use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, FunctionAST, PrototypeAST, AST};
 use crate::error::ParseError;
 use crate::here;
+use crate::util::optionize;
 use anyhow::Result;
 
 const ANONYMOUS_FUNCTION_NAME: &str = "anonymous";
@@ -177,8 +178,7 @@ impl<'a> Parser<'a> {
     fn parse_function_return_type(&mut self) -> Result<ExprType> {
         parse!(self, TokenType::RightArrow)?;
         skip_whitespace_and_comments!(self);
-        let idx = self.current_token.idx;
-        let idx = (Some(idx.0), Some(idx.1));
+        let idx = optionize(self.lexer.get_token_idx());
         let pos = self.lexer.get_token_pos();
         let type_ident = parse_identifier!(self)?;
 
@@ -197,8 +197,7 @@ impl<'a> Parser<'a> {
                 let arg_name = parse_identifier!(self)?;
                 parse!(self, TokenType::Colon)?;
                 skip_whitespace_and_comments!(self);
-                let idx = self.current_token.idx;
-                let idx = (Some(idx.0), Some(idx.1));
+                let idx = optionize(self.lexer.get_token_idx());
                 let pos = self.lexer.get_token_pos();
                 let type_ident = parse_identifier!(self)?;
                 function_args.push((
@@ -408,8 +407,8 @@ impl<'a> Parser<'a> {
             }
             self.advance_token();
         }
-        let end = parse!(self, TokenType::DoubleQuotes)?.idx.1;
-
+        parse!(self, TokenType::DoubleQuotes)?;
+        let end = self.lexer.get_token_idx().1;
         Ok(ExprAST::new_string(result, (start, end), pos))
     }
 

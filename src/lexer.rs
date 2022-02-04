@@ -36,7 +36,7 @@ impl Lexer {
         self.current_token_pos = (self.row, self.col);
 
         let token = if !self.has_more_tokens() {
-            return Token::new(self.get_token_idx(), TokenType::Eof);
+            return Token::new(TokenType::Eof);
         } else {
             self.identify_token()
         };
@@ -50,7 +50,7 @@ impl Lexer {
     }
 
     pub fn get_token_idx(&self) -> (usize, usize) {
-        (self.idx_token_start, self.idx)
+        (self.idx_token_start, self.idx - 1)
     }
 
     pub fn get_context(&self, idx: (Option<usize>, Option<usize>)) -> String {
@@ -104,57 +104,57 @@ impl Lexer {
             match start {
                 '"' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::DoubleQuotes);
+                    return Token::new(TokenType::DoubleQuotes);
                 }
                 '(' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::LeftParen);
+                    return Token::new(TokenType::LeftParen);
                 }
                 ')' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::RightParen);
+                    return Token::new(TokenType::RightParen);
                 }
                 '{' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::LeftCurly);
+                    return Token::new(TokenType::LeftCurly);
                 }
                 '}' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::RightCurly);
+                    return Token::new(TokenType::RightCurly);
                 }
                 ';' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::Semicolon);
+                    return Token::new(TokenType::Semicolon);
                 }
                 ':' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::Colon);
+                    return Token::new(TokenType::Colon);
                 }
                 ',' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::Comma);
+                    return Token::new(TokenType::Comma);
                 }
                 '+' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::Plus);
+                    return Token::new(TokenType::Plus);
                 }
                 '-' => {
                     return if self.peek(1) == Some('>') {
                         self.advance_index();
                         self.advance_index();
-                        Token::new(self.get_token_idx(), TokenType::RightArrow)
+                        Token::new(TokenType::RightArrow)
                     } else {
                         self.advance_index();
-                        Token::new(self.get_token_idx(), TokenType::Minus)
+                        Token::new(TokenType::Minus)
                     }
                 }
                 '*' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::Mul);
+                    return Token::new(TokenType::Mul);
                 }
                 '/' => {
                     self.advance_index();
-                    return Token::new(self.get_token_idx(), TokenType::Div);
+                    return Token::new(TokenType::Div);
                 }
                 _ => (),
             }
@@ -162,19 +162,19 @@ impl Lexer {
             return if start.is_ascii_alphabetic() {
                 let identifier = self.parse_identifier();
                 match identifier.as_str() {
-                    "fn" => Token::new(self.get_token_idx(), TokenType::Fn),
-                    _ => Token::new(self.get_token_idx(), TokenType::Identifier(identifier)),
+                    "fn" => Token::new(TokenType::Fn),
+                    _ => Token::new(TokenType::Identifier(identifier)),
                 }
             } else if start.is_ascii_digit() {
                 let number = self.parse_number();
-                Token::new(self.get_token_idx(), TokenType::Integer(number))
+                Token::new(TokenType::Integer(number))
             } else {
                 self.advance_index();
-                Token::new(self.get_token_idx(), TokenType::Other(start))
+                Token::new(TokenType::Other(start))
             };
         }
 
-        Token::new(self.get_token_idx(), TokenType::Eof)
+        Token::new(TokenType::Eof)
     }
 
     fn parse_number(&mut self) -> i32 {
@@ -235,7 +235,7 @@ impl Lexer {
                 break;
             }
         }
-        Token::new(self.get_token_idx(), TokenType::Whitespace(ws))
+        Token::new(TokenType::Whitespace(ws))
     }
 
     fn skip_comment(&mut self) -> Token {
@@ -248,7 +248,7 @@ impl Lexer {
             comment.push(c);
             self.advance_index();
         }
-        Token::new(self.get_token_idx(), TokenType::Comment(comment))
+        Token::new(TokenType::Comment(comment))
     }
 
     fn has_more_tokens(&self) -> bool {

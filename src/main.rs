@@ -33,6 +33,7 @@ mod parser;
 mod program;
 mod token;
 mod typecheck;
+mod util;
 
 #[macro_export]
 macro_rules! here {
