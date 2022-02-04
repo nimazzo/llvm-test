@@ -84,7 +84,6 @@ impl Lexer {
         context
     }
 
-    /*========== Private Functions ==========*/
     pub fn get_token_pos(&self) -> (usize, usize) {
         // let token_len = self.idx - self.idx_token_start;
         // (self.row, self.col - token_len)
@@ -92,6 +91,7 @@ impl Lexer {
         self.current_token_pos
     }
 
+    /*========== Private Functions ==========*/
     fn identify_token(&mut self) -> Token {
         if let Some(token) = self.skip_whitespace_and_comments() {
             return token;
