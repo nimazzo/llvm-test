@@ -225,10 +225,8 @@ impl Parser {
         }
 
         let body = self.parse_sequence(expressions)?;
+        parse!(self, TokenType::RightCurly)?;
 
-        if body.requires_semicolon() {
-            parse!(self, TokenType::RightCurly)?;
-        }
         self.console
             .println_verbose("[Parser] Successfully parsed function body");
         Ok(body)
