@@ -8,7 +8,6 @@ extern crate inkwell;
 use crate::compiler::Compiler;
 use crate::lexer::Lexer;
 use crate::program::CompiledProgram;
-use crate::token::TokenType;
 use clap::{ErrorKind, IntoApp, Parser, Subcommand};
 use std::error::Error;
 use std::ffi::OsStr;

@@ -1,4 +1,4 @@
-use crate::token::{Token, TokenType};
+use crate::token::Token;
 use crate::Console;
 
 #[derive(Clone)]
@@ -36,7 +36,7 @@ impl Lexer {
         self.current_token_pos = (self.row, self.col);
 
         let token = if !self.has_more_tokens() {
-            return Token::new(TokenType::Eof);
+            return Token::Eof;
         } else {
             self.identify_token()
         };
@@ -44,7 +44,7 @@ impl Lexer {
         let pos = self.get_token_pos();
         self.console.println_verbose(format!(
             "[Lexer] Parsed token: {} at:({}:{})",
-            token.token_type, pos.0, pos.1
+            token, pos.0, pos.1
         ));
         token
     }
@@ -104,57 +104,57 @@ impl Lexer {
             match start {
                 '"' => {
                     self.advance_index();
-                    return Token::new(TokenType::DoubleQuotes);
+                    return Token::DoubleQuotes;
                 }
                 '(' => {
                     self.advance_index();
-                    return Token::new(TokenType::LeftParen);
+                    return Token::LeftParen;
                 }
                 ')' => {
                     self.advance_index();
-                    return Token::new(TokenType::RightParen);
+                    return Token::RightParen;
                 }
                 '{' => {
                     self.advance_index();
-                    return Token::new(TokenType::LeftCurly);
+                    return Token::LeftCurly;
                 }
                 '}' => {
                     self.advance_index();
-                    return Token::new(TokenType::RightCurly);
+                    return Token::RightCurly;
                 }
                 ';' => {
                     self.advance_index();
-                    return Token::new(TokenType::Semicolon);
+                    return Token::Semicolon;
                 }
                 ':' => {
                     self.advance_index();
-                    return Token::new(TokenType::Colon);
+                    return Token::Colon;
                 }
                 ',' => {
                     self.advance_index();
-                    return Token::new(TokenType::Comma);
+                    return Token::Comma;
                 }
                 '+' => {
                     self.advance_index();
-                    return Token::new(TokenType::Plus);
+                    return Token::Plus;
                 }
                 '-' => {
                     return if self.peek(1) == Some('>') {
                         self.advance_index();
                         self.advance_index();
-                        Token::new(TokenType::RightArrow)
+                        Token::RightArrow
                     } else {
                         self.advance_index();
-                        Token::new(TokenType::Minus)
+                        Token::Minus
                     }
                 }
                 '*' => {
                     self.advance_index();
-                    return Token::new(TokenType::Mul);
+                    return Token::Mul;
                 }
                 '/' => {
                     self.advance_index();
-                    return Token::new(TokenType::Div);
+                    return Token::Div;
                 }
                 _ => (),
             }
@@ -162,19 +162,19 @@ impl Lexer {
             return if start.is_ascii_alphabetic() {
                 let identifier = self.parse_identifier();
                 match identifier.as_str() {
-                    "fn" => Token::new(TokenType::Fn),
-                    _ => Token::new(TokenType::Identifier(identifier)),
+                    "fn" => Token::Fn,
+                    _ => Token::Identifier(identifier),
                 }
             } else if start.is_ascii_digit() {
                 let number = self.parse_number();
-                Token::new(TokenType::Integer(number))
+                Token::Integer(number)
             } else {
                 self.advance_index();
-                Token::new(TokenType::Other(start))
+                Token::Other(start)
             };
         }
 
-        Token::new(TokenType::Eof)
+        Token::Eof
     }
 
     fn parse_number(&mut self) -> i32 {
@@ -235,7 +235,7 @@ impl Lexer {
                 break;
             }
         }
-        Token::new(TokenType::Whitespace(ws))
+        Token::Whitespace(ws)
     }
 
     fn skip_comment(&mut self) -> Token {
@@ -248,7 +248,7 @@ impl Lexer {
             comment.push(c);
             self.advance_index();
         }
-        Token::new(TokenType::Comment(comment))
+        Token::Comment(comment)
     }
 
     fn has_more_tokens(&self) -> bool {

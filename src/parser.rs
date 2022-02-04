@@ -1,5 +1,5 @@
 use crate::token::Token;
-use crate::{token, Console, Lexer, TokenType};
+use crate::{Console, Lexer};
 
 use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, FunctionAST, PrototypeAST, AST};
 use crate::error::ParseError;
@@ -13,7 +13,7 @@ macro_rules! parse {
     ($self: ident, $tk: path) => {{
         skip_whitespace_and_comments!($self);
 
-        match $self.curr_token_type() {
+        match $self.current_token.clone() {
             $tk => {
                 let token = $self.advance_token();
                 Ok(token)
@@ -31,7 +31,7 @@ macro_rules! parse {
 macro_rules! peek {
     ($self: ident) => {{
         skip_whitespace_and_comments!($self);
-        $self.curr_token_type()
+        $self.current_token.clone()
     }};
 }
 
@@ -39,8 +39,8 @@ macro_rules! parse_identifier {
     ($self: ident) => {{
         skip_whitespace_and_comments!($self);
 
-        match $self.curr_token_type() {
-            TokenType::Identifier(id) => {
+        match $self.current_token.clone() {
+            Token::Identifier(id) => {
                 $self.advance_token();
                 Ok(id)
             }
@@ -59,14 +59,14 @@ macro_rules! peek_identifier {
     ($self: ident) => {{
         skip_whitespace_and_comments!($self);
 
-        match $self.curr_token_type() {
-            TokenType::Identifier(id) => Ok(id),
+        match $self.current_token.clone() {
+            Token::Identifier(id) => Ok(id),
             _ => Err(ParseError::missing_token(
                 $self.lexer.get_context((None, None)),
                 "Identifier",
                 here!(),
             )
-            .with_pos($self.current_token.pos)),
+            .with_pos($self.lexer.get_token_pos())),
         }
     }};
 }
@@ -74,9 +74,9 @@ macro_rules! peek_identifier {
 macro_rules! skip_whitespace_and_comments {
     ($self: ident) => {{
         loop {
-            match $self.curr_token_type() {
-                TokenType::Whitespace(_) => $self.advance_token(),
-                TokenType::Comment(_) => $self.advance_token(),
+            match &$self.current_token {
+                Token::Whitespace(_) => $self.advance_token(),
+                Token::Comment(_) => $self.advance_token(),
                 _ => break,
             };
         }
@@ -103,11 +103,11 @@ impl<'a> Parser<'a> {
         let mut program = vec![];
         loop {
             match peek!(self) {
-                TokenType::Fn => {
+                Token::Fn => {
                     let fun = self.parse_function()?;
                     program.push(ASTPrimitive::Function(fun));
                 }
-                TokenType::Eof => {
+                Token::Eof => {
                     break;
                 }
                 _ => {
@@ -124,10 +124,6 @@ impl<'a> Parser<'a> {
         let current_token = self.current_token.clone();
         self.current_token = self.lexer.next_token();
         current_token
-    }
-
-    fn curr_token_type(&self) -> TokenType {
-        self.current_token.token_type.clone()
     }
 
     fn parse_function(&mut self) -> Result<FunctionAST> {
@@ -154,7 +150,7 @@ impl<'a> Parser<'a> {
             .println_verbose("[Parser] Trying to parse function prototype");
         let (context_start, _) = self.lexer.get_token_idx();
         let pos = self.lexer.get_token_pos();
-        parse!(self, TokenType::Fn)?;
+        parse!(self, Token::Fn)?;
         let function_name = parse_identifier!(self)?;
 
         // Parse function arguments
@@ -176,7 +172,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_return_type(&mut self) -> Result<ExprType> {
-        parse!(self, TokenType::RightArrow)?;
+        parse!(self, Token::RightArrow)?;
         skip_whitespace_and_comments!(self);
         let idx = optionize(self.lexer.get_token_idx());
         let pos = self.lexer.get_token_pos();
@@ -191,11 +187,11 @@ impl<'a> Parser<'a> {
 
     fn parse_function_arguments(&mut self) -> Result<Vec<(String, ExprType)>> {
         let mut function_args = vec![];
-        parse!(self, TokenType::LeftParen)?;
-        if peek!(self) != TokenType::RightParen {
+        parse!(self, Token::LeftParen)?;
+        if peek!(self) != Token::RightParen {
             loop {
                 let arg_name = parse_identifier!(self)?;
-                parse!(self, TokenType::Colon)?;
+                parse!(self, Token::Colon)?;
                 skip_whitespace_and_comments!(self);
                 let idx = optionize(self.lexer.get_token_idx());
                 let pos = self.lexer.get_token_pos();
@@ -207,25 +203,25 @@ impl<'a> Parser<'a> {
                             .with_pos(pos)
                     })?,
                 ));
-                if peek!(self) == TokenType::Comma {
-                    parse!(self, TokenType::Comma)?;
+                if peek!(self) == Token::Comma {
+                    parse!(self, Token::Comma)?;
                 } else {
                     break;
                 }
             }
         }
-        parse!(self, TokenType::RightParen)?;
+        parse!(self, Token::RightParen)?;
         Ok(function_args)
     }
 
     fn parse_function_body(&mut self) -> Result<ExprAST> {
         self.console
             .println_verbose("[Parser] Trying to parse function body");
-        parse!(self, TokenType::LeftCurly)?;
+        parse!(self, Token::LeftCurly)?;
 
         // Function has empty body
-        if peek!(self) == TokenType::RightCurly {
-            parse!(self, TokenType::RightCurly)?;
+        if peek!(self) == Token::RightCurly {
+            parse!(self, Token::RightCurly)?;
             return Ok(ExprAST::new_nop((0, 0), (0, 0)));
         }
 
@@ -233,17 +229,17 @@ impl<'a> Parser<'a> {
         loop {
             let body = self.parse_expression()?;
             if body.variant.requires_semicolon() {
-                parse!(self, TokenType::Semicolon)?;
+                parse!(self, Token::Semicolon)?;
             }
             expressions.push(body);
             match peek!(self) {
-                TokenType::RightCurly | TokenType::Eof => break,
+                Token::RightCurly | Token::Eof => break,
                 _ => {}
             };
         }
 
         let body = self.parse_sequence(expressions)?;
-        parse!(self, TokenType::RightCurly)?;
+        parse!(self, Token::RightCurly)?;
 
         self.console
             .println_verbose("[Parser] Successfully parsed function body");
@@ -281,11 +277,11 @@ impl<'a> Parser<'a> {
         loop {
             let body = self.parse_expression()?;
             if body.variant.requires_semicolon() {
-                parse!(self, TokenType::Semicolon)?;
+                parse!(self, Token::Semicolon)?;
             }
             expressions.push(body);
             match peek!(self) {
-                TokenType::Eof | TokenType::Fn => break,
+                Token::Eof | Token::Fn => break,
                 _ => {}
             }
         }
@@ -319,11 +315,11 @@ impl<'a> Parser<'a> {
     fn parse_primary(&mut self) -> Result<ExprAST> {
         // skip_whitespace_and_comments!(self);
         match peek!(self) {
-            TokenType::Integer(n) => self.parse_integer_expr(n),
-            TokenType::DoubleQuotes => self.parse_string(),
-            TokenType::Identifier(_) => self.parse_identifier(),
-            TokenType::LeftParen => self.parse_paren_expr(),
-            TokenType::Eof => Err(ParseError::unexpected_eof(
+            Token::Integer(n) => self.parse_integer_expr(n),
+            Token::DoubleQuotes => self.parse_string(),
+            Token::Identifier(_) => self.parse_identifier(),
+            Token::LeftParen => self.parse_paren_expr(),
+            Token::Eof => Err(ParseError::unexpected_eof(
                 self.lexer.get_context((None, None)),
                 here!(),
             )
@@ -345,7 +341,7 @@ impl<'a> Parser<'a> {
         let context_start = self.lexer.get_token_idx().0;
         let pos = self.lexer.get_token_pos();
         let ident = parse_identifier!(self)?;
-        if peek!(self) == TokenType::LeftParen {
+        if peek!(self) == Token::LeftParen {
             let call_args = self.parse_call_arguments()?;
             let context_end = self.lexer.get_token_idx().1;
             Ok(ExprAST::new_function_call(
@@ -368,21 +364,21 @@ impl<'a> Parser<'a> {
 
     fn parse_call_arguments(&mut self) -> Result<Vec<ExprAST>> {
         let mut call_args = vec![];
-        parse!(self, TokenType::LeftParen)?;
+        parse!(self, Token::LeftParen)?;
 
-        if peek!(self) != TokenType::RightParen {
+        if peek!(self) != Token::RightParen {
             loop {
                 let arg = self.parse_expression()?;
 
                 call_args.push(arg);
-                if peek!(self) == TokenType::Comma {
-                    parse!(self, TokenType::Comma)?;
+                if peek!(self) == Token::Comma {
+                    parse!(self, Token::Comma)?;
                 } else {
                     break;
                 }
             }
         }
-        parse!(self, TokenType::RightParen)?;
+        parse!(self, Token::RightParen)?;
         Ok(call_args)
     }
 
@@ -390,12 +386,12 @@ impl<'a> Parser<'a> {
         let pos = self.lexer.get_token_pos();
         let start = self.lexer.get_token_idx().0;
         let mut result = String::new();
-        parse!(self, TokenType::DoubleQuotes)?;
+        parse!(self, Token::DoubleQuotes)?;
 
         loop {
-            match self.curr_token_type() {
-                TokenType::DoubleQuotes => break,
-                TokenType::Eof => {
+            match &self.current_token {
+                Token::DoubleQuotes => break,
+                Token::Eof => {
                     return Err(ParseError::unexpected_eof(
                         self.lexer.get_context((Some(start), None)),
                         here!(),
@@ -407,7 +403,7 @@ impl<'a> Parser<'a> {
             }
             self.advance_token();
         }
-        parse!(self, TokenType::DoubleQuotes)?;
+        parse!(self, Token::DoubleQuotes)?;
         let end = self.lexer.get_token_idx().1;
         Ok(ExprAST::new_string(result, (start, end), pos))
     }
@@ -421,9 +417,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_paren_expr(&mut self) -> Result<ExprAST> {
-        parse!(self, TokenType::LeftParen)?;
+        parse!(self, Token::LeftParen)?;
         let expr = self.parse_expression()?;
-        parse!(self, TokenType::RightParen)?;
+        parse!(self, Token::RightParen)?;
         Ok(expr)
     }
 
@@ -431,7 +427,7 @@ impl<'a> Parser<'a> {
         // if this is a binary operation, find its precedence
         loop {
             skip_whitespace_and_comments!(self);
-            let token_prec = token::get_token_precedence(&self.current_token);
+            let token_prec = self.current_token.get_precedence();
 
             // If this is a binop that binds at least as tightly as the current binop,
             // consume it, otherwise we are done.
@@ -440,10 +436,10 @@ impl<'a> Parser<'a> {
             }
 
             let binop = match peek!(self) {
-                TokenType::Plus => BinOp::Add,
-                TokenType::Minus => BinOp::Minus,
-                TokenType::Mul => BinOp::Mul,
-                TokenType::Div => BinOp::Div,
+                Token::Plus => BinOp::Add,
+                Token::Minus => BinOp::Minus,
+                Token::Mul => BinOp::Mul,
+                Token::Div => BinOp::Div,
                 _ => {
                     return Err(ParseError::missing_token(
                         self.lexer.get_context((None, None)),
@@ -461,7 +457,7 @@ impl<'a> Parser<'a> {
             let mut rhs = self.parse_primary()?;
 
             skip_whitespace_and_comments!(self);
-            let next_prec = token::get_token_precedence(&self.current_token);
+            let next_prec = self.current_token.get_precedence();
             if token_prec < next_prec {
                 rhs = self.parse_binop_rhs(token_prec + 1, rhs)?;
             }

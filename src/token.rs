@@ -1,18 +1,7 @@
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone)]
-pub struct Token {
-    pub token_type: TokenType,
-}
-
-impl Token {
-    pub fn new(token_type: TokenType) -> Self {
-        Self { token_type }
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
-pub enum TokenType {
+pub enum Token {
     Eof,
     Integer(i32),
     Plus,
@@ -35,70 +24,66 @@ pub enum TokenType {
     Other(char),
 }
 
-impl Display for TokenType {
+impl Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            TokenType::Eof => f.write_str("<EOF>"),
-            TokenType::Integer(n) => f.write_str(&format!("Integer('{}')", *n)),
-            TokenType::Plus => f.write_str("Plus('+')"),
-            TokenType::Minus => f.write_str("Minus('-')"),
-            TokenType::Mul => f.write_str("Mul('*')"),
-            TokenType::Div => f.write_str("ForwardSlash('/')"),
-            TokenType::Fn => f.write_str("Fn"),
-            TokenType::Identifier(id) => f.write_str(&format!("Identifier('{}')", id)),
-            TokenType::Whitespace(_) => f.write_str("WS"),
-            TokenType::LeftParen => f.write_str("LeftParen('(')"),
-            TokenType::RightParen => f.write_str("RightParen(')')"),
-            TokenType::LeftCurly => f.write_str("LeftCurly('{')"),
-            TokenType::RightCurly => f.write_str("RightCurly('}')"),
-            TokenType::Semicolon => f.write_str("Semicolon(';')"),
-            TokenType::Colon => f.write_str("Colon(':')"),
-            TokenType::Comma => f.write_str("Comma(',')"),
-            TokenType::DoubleQuotes => f.write_str("DoubleQuotes('\"')"),
-            TokenType::RightArrow => f.write_str("RightArrrow('->')"),
-            TokenType::Comment(c) => f.write_str(&format!("Comment('{}')", c)),
-            TokenType::Other(c) => f.write_str(&format!("Other('{}')", *c)),
+            Token::Eof => f.write_str("<EOF>"),
+            Token::Integer(n) => f.write_str(&format!("Integer('{}')", *n)),
+            Token::Plus => f.write_str("Plus('+')"),
+            Token::Minus => f.write_str("Minus('-')"),
+            Token::Mul => f.write_str("Mul('*')"),
+            Token::Div => f.write_str("ForwardSlash('/')"),
+            Token::Fn => f.write_str("Fn"),
+            Token::Identifier(id) => f.write_str(&format!("Identifier('{}')", id)),
+            Token::Whitespace(_) => f.write_str("WS"),
+            Token::LeftParen => f.write_str("LeftParen('(')"),
+            Token::RightParen => f.write_str("RightParen(')')"),
+            Token::LeftCurly => f.write_str("LeftCurly('{')"),
+            Token::RightCurly => f.write_str("RightCurly('}')"),
+            Token::Semicolon => f.write_str("Semicolon(';')"),
+            Token::Colon => f.write_str("Colon(':')"),
+            Token::Comma => f.write_str("Comma(',')"),
+            Token::DoubleQuotes => f.write_str("DoubleQuotes('\"')"),
+            Token::RightArrow => f.write_str("RightArrrow('->')"),
+            Token::Comment(c) => f.write_str(&format!("Comment('{}')", c)),
+            Token::Other(c) => f.write_str(&format!("Other('{}')", *c)),
         }
     }
 }
 
-impl TokenType {
+impl Token {
     pub fn as_str(&self) -> String {
         match self {
-            TokenType::Eof => "".to_string(),
-            TokenType::Integer(n) => n.to_string(),
-            TokenType::Plus => "+".to_string(),
-            TokenType::Minus => "-".to_string(),
-            TokenType::Mul => "*".to_string(),
-            TokenType::Div => "/".to_string(),
-            TokenType::Fn => "fn".to_string(),
-            TokenType::Identifier(id) => id.clone(),
-            TokenType::Whitespace(c) => c.clone(),
-            TokenType::LeftParen => "(".to_string(),
-            TokenType::RightParen => ")".to_string(),
-            TokenType::LeftCurly => "}".to_string(),
-            TokenType::RightCurly => "}".to_string(),
-            TokenType::Semicolon => ";".to_string(),
-            TokenType::Colon => ":".to_string(),
-            TokenType::Comma => ",".to_string(),
-            TokenType::DoubleQuotes => "\"".to_string(),
-            TokenType::RightArrow => "->".to_string(),
-            TokenType::Comment(c) => c.clone(),
-            TokenType::Other(c) => c.to_string(),
+            Token::Eof => "".to_string(),
+            Token::Integer(n) => n.to_string(),
+            Token::Plus => "+".to_string(),
+            Token::Minus => "-".to_string(),
+            Token::Mul => "*".to_string(),
+            Token::Div => "/".to_string(),
+            Token::Fn => "fn".to_string(),
+            Token::Identifier(id) => id.clone(),
+            Token::Whitespace(c) => c.clone(),
+            Token::LeftParen => "(".to_string(),
+            Token::RightParen => ")".to_string(),
+            Token::LeftCurly => "}".to_string(),
+            Token::RightCurly => "}".to_string(),
+            Token::Semicolon => ";".to_string(),
+            Token::Colon => ":".to_string(),
+            Token::Comma => ",".to_string(),
+            Token::DoubleQuotes => "\"".to_string(),
+            Token::RightArrow => "->".to_string(),
+            Token::Comment(c) => c.clone(),
+            Token::Other(c) => c.to_string(),
         }
     }
 
-    fn get_precedence(&self) -> i32 {
+    pub fn get_precedence(&self) -> i32 {
         match self {
-            TokenType::Plus => 20,
-            TokenType::Minus => 20,
-            TokenType::Mul => 30,
-            TokenType::Div => 30,
+            Token::Plus => 20,
+            Token::Minus => 20,
+            Token::Mul => 30,
+            Token::Div => 30,
             _ => -1,
         }
     }
-}
-
-pub fn get_token_precedence(token: &Token) -> i32 {
-    token.token_type.get_precedence()
 }
