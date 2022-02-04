@@ -211,12 +211,11 @@ impl<'ctx> Compiler<'ctx> {
 
     pub fn compile_expr(&self, expr: &ExprAST) -> Result<BasicValueEnum<'ctx>> {
         let value = match expr {
-            ExprAST::Integer(value) => {
-                self.context
-                    .i32_type()
-                    .const_int(*value as u64, true) // todo: maybe change this to true?
-                    .into()
-            }
+            ExprAST::Integer(value) => self
+                .context
+                .i32_type()
+                .const_int(*value as u64, true)
+                .into(),
             ExprAST::String(s) => self.compile_string(s)?,
             ExprAST::Variable { ident, .. } => match self.variables.get(ident) {
                 Some(ptr) => self.builder.build_load(*ptr, ident),

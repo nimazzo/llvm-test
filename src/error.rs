@@ -15,16 +15,22 @@ pub struct ParseError {
 pub enum ParseErrorType {
     #[error("Missing '{0}' token")]
     MissingToken(String),
-    #[error("Not a primary expression: {0}")]
+    #[error("Not a primary expression: '{0}'")]
     NoPrimaryExpression(String),
     #[error("Incompatible types: Expected: '{0}' Found: '{1}'")]
     UnexpectedType(String, String),
-    #[error("Wrong Argument Count: Expected: '{0}' Found: '{1}'")]
+    #[error("Wrong Function Argument Count: Expected: '{0}' Found: '{1}'")]
     WrongArgumentCount(usize, usize),
     #[error("Unknown type: '{0}'")]
     UnknownType(String),
-    #[error("Illegal Type: {0}")]
+    #[error("Illegal Type: '{0}'")]
     IllegalType(String),
+    #[error("Duplicate Function Definition: '{0}'")]
+    DuplicateFunctionDefinition(String),
+    #[error("Program is missing a main function")]
+    MissingMain,
+    #[error("Wrong Main Function Signature: {0}")]
+    WrongMainSignature(String),
     #[error("Unexpected end of file")]
     UnexpectedEOF,
 }
@@ -150,6 +156,36 @@ impl ParseError {
         Self {
             context,
             error_type: ParseErrorType::IllegalType(desc.to_string()),
+            location,
+            row: None,
+            col: None,
+        }
+    }
+
+    pub fn duplicate_function_definition(context: String, desc: &str, location: String) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::DuplicateFunctionDefinition(desc.to_string()),
+            location,
+            row: None,
+            col: None,
+        }
+    }
+
+    pub fn missing_main(context: String, location: String) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::MissingMain,
+            location,
+            row: None,
+            col: None,
+        }
+    }
+
+    pub fn wrong_main_function_signature(context: String, desc: &str, location: String) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::WrongMainSignature(desc.to_string()),
             location,
             row: None,
             col: None,

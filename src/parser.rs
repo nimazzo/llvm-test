@@ -135,9 +135,6 @@ impl Parser {
         let proto = self.parse_function_prototype()?;
         let body = self.parse_function_body()?;
 
-        // todo: move type checking functionality to other procedure
-        // self.type_check_function(&proto, &body, context_start, context_end)?;
-
         self.console
             .println_verbose("[Parser] Successfully parsed function");
         Ok(FunctionAST::new(proto, body))
@@ -155,17 +152,6 @@ impl Parser {
         // Parse function return type
         let ret_type = self.parse_function_return_type()?;
 
-        // todo: Move type checking to procedure over AST
-        // if function_name == "main" && ret_type != ExprType::Integer {
-        //     return Err(ParseError::unexpected_type(
-        //         self.lexer.get_context(idx),
-        //         "Integer",
-        //         ret_type.as_str(),
-        //         here!(),
-        //     )
-        //     .with_pos(pos)
-        //     .into());
-        // }
         self.console
             .println_verbose("[Parser] Successfully parsed function prototype");
         Ok(PrototypeAST::new(function_name, function_args, ret_type))

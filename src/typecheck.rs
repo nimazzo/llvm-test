@@ -39,17 +39,57 @@ impl TypeChecker {
         });
 
         // store all known function types
-        ast.iter()
-            .filter_map(|node| {
-                if let ASTPrimitive::Function(fun) = node {
-                    Some(fun)
-                } else {
-                    None
+        let function_definitions = ast.iter().filter_map(|node| {
+            if let ASTPrimitive::Function(fun) = node {
+                Some(fun)
+            } else {
+                None
+            }
+        });
+
+        let mut main_function = None;
+        for fun in function_definitions {
+            if fun.proto.name == "main" {
+                main_function = Some(fun);
+            }
+            if let Some(old) = functions.insert(fun.proto.name.clone(), fun.proto.clone()) {
+                return Err(ParseError::duplicate_function_definition(
+                    "TODO".to_string(),
+                    &old.name,
+                    here!(),
+                )
+                .into());
+            };
+        }
+
+        match main_function {
+            Some(fun) => {
+                let arg_count = fun.proto.args.len();
+                if arg_count != 0 {
+                    return Err(ParseError::wrong_main_function_signature(
+                        "TODO".to_string(),
+                        &format!(
+                            "Main Function expects '0' parameters, found '{}'",
+                            arg_count
+                        ),
+                        here!(),
+                    )
+                    .into());
                 }
-            })
-            .for_each(|fun| {
-                functions.insert(fun.proto.name.clone(), fun.proto.clone());
-            });
+                let ret_type = fun.proto.ty;
+                if ret_type != ExprType::Integer {
+                    return Err(ParseError::wrong_main_function_signature(
+                        "TODO".to_string(),
+                        &format!("Return Type must be 'int', found '{}'", ret_type.as_str()),
+                        here!(),
+                    )
+                    .into());
+                }
+            }
+            None => {
+                return Err(ParseError::missing_main("TODO".to_string(), here!()).into());
+            }
+        }
 
         self.context.add_functions(functions);
 
