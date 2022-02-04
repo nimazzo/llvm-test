@@ -1,15 +1,15 @@
 use crate::ast::{ExprAST, ExprType, PrototypeAST};
-use crate::core::InternalFunction::PrintString;
-use crate::{here, CompileError, Compiler};
-use inkwell::types::BasicMetadataTypeEnum;
-use inkwell::values::FunctionValue;
+use crate::core::InternalFunction::{PrintInteger, PrintString};
+use crate::Compiler;
 use inkwell::AddressSpace;
 
 use crate::core::ExternalFuncton::Printf;
 use anyhow::Result;
+use inkwell::module::Linkage;
 
 pub enum InternalFunction {
     PrintString,
+    PrintInteger,
 }
 
 pub enum ExternalFuncton {
@@ -19,11 +19,14 @@ pub enum ExternalFuncton {
 // Internal Prototype Definitions
 pub fn get_internal_definitions() -> Vec<PrototypeAST> {
     let mut ast = vec![];
-    let functions = [PrintString]; // !!!Add new Values here!!!
+    let functions = [PrintString, PrintInteger]; // !!!Add new Values here!!!
     for function in functions {
         match function {
             PrintString => {
-                ast.push(get_print_string_definition());
+                // ast.push(get_print_string_definition());
+            }
+            PrintInteger => {
+                ast.push(get_print_integer_definition());
             }
         }
     }
@@ -34,6 +37,16 @@ fn get_print_string_definition() -> PrototypeAST {
     PrototypeAST::new(
         "print".to_string(),
         vec![("s".to_string(), ExprType::String)],
+        ExprType::Integer,
+        (0, 0),
+        (0, 0),
+    )
+}
+
+fn get_print_integer_definition() -> PrototypeAST {
+    PrototypeAST::new(
+        "print".to_string(),
+        vec![("s".to_string(), ExprType::Integer)],
         ExprType::Integer,
         (0, 0),
         (0, 0),
@@ -67,41 +80,28 @@ fn define_printf(compiler: &Compiler) -> Result<()> {
 
 // Compile Internal Functions
 pub fn compile_internal_functions(compiler: &mut Compiler) -> Result<()> {
-    let functions = [PrintString]; // !!!Add new Values here!!!
+    let functions = [PrintString, PrintInteger]; // !!!Add new Values here!!!
     for function in functions {
         match function {
             PrintString => {
-                compile_print_string(compiler)?;
+                // compile_print_string(compiler)?;
+            }
+            PrintInteger => {
+                compile_print_integer(compiler)?;
             }
         }
     }
     Ok(())
 }
 
-fn compile_print_string<'ctx>(compiler: &'ctx mut Compiler) -> Result<FunctionValue<'ctx>> {
-    // compile function prototype
-    let internal_name = "__internal_print_string".to_string();
-    let public_name = "print".to_string();
+fn compile_print_string(compiler: &mut Compiler) -> Result<()> {
+    let internal_name = "__internal_print_string";
+    let public_name = "print";
 
     let args = vec![("s".to_string(), ExprType::String)];
-    let proto = PrototypeAST::new(
-        internal_name.clone(),
-        args,
-        ExprType::Integer,
-        (0, 0),
-        (0, 0),
-    );
-
-    let function = {
-        let args_types = vec![BasicMetadataTypeEnum::from(
-            compiler.context.i8_type().ptr_type(AddressSpace::Generic),
-        )];
-        let fn_type = compiler.context.i32_type().fn_type(&args_types, false);
-        compiler.module.add_function(&internal_name, fn_type, None)
-    };
-
-    // Compile function body
-    compiler.alloc_fn_arguments(function, &proto)?;
+    let ret_type = ExprType::Integer;
+    let is_var_args = true;
+    let linkage = None;
 
     // compile function body
     let body = ExprAST::new_function_call(
@@ -116,20 +116,65 @@ fn compile_print_string<'ctx>(compiler: &'ctx mut Compiler) -> Result<FunctionVa
     )
     .set_internal();
 
-    let compiled_body = compiler.compile_expr(&body)?;
-    compiler.builder.build_return(Some(&compiled_body));
+    compile_function(
+        compiler,
+        internal_name,
+        public_name,
+        args,
+        ret_type,
+        is_var_args,
+        linkage,
+        body,
+    )
+}
 
-    // reset fn specific fields to default
-    compiler.curr_fn = None;
-    compiler.variables.clear();
+fn compile_print_integer(compiler: &mut Compiler) -> Result<()> {
+    let internal_name = "__internal_print_integer";
+    let public_name = "print";
 
-    if function.verify(true) {
-        compiler.functions.insert(public_name, proto);
-        Ok(function)
-    } else {
-        unsafe {
-            function.delete();
-        }
-        Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
-    }
+    let args = vec![("n".to_string(), ExprType::Integer)];
+    let ret_type = ExprType::Integer;
+    let is_var_args = true;
+    let linkage = None;
+
+    // compile function body
+    let body = ExprAST::new_function_call(
+        "printf".to_string(),
+        vec![
+            ExprAST::new_string("%d\n".to_string(), (0, 0), (0, 0)),
+            ExprAST::new_variable("n".to_string(), Some(ExprType::Integer), (0, 0), (0, 0)),
+        ],
+        Some(ExprType::Integer),
+        (0, 0),
+        (0, 0),
+    )
+    .set_internal();
+
+    compile_function(
+        compiler,
+        internal_name,
+        public_name,
+        args,
+        ret_type,
+        is_var_args,
+        linkage,
+        body,
+    )
+}
+
+fn compile_function(
+    compiler: &mut Compiler,
+    internal_name: &str,
+    public_name: &str,
+    args: Vec<(String, ExprType)>,
+    ret_type: ExprType,
+    is_var_args: bool,
+    linkage: Option<Linkage>,
+    body: ExprAST,
+) -> Result<()> {
+    let proto = PrototypeAST::new(internal_name.to_string(), args, ret_type, (0, 0), (0, 0));
+
+    compiler
+        .compile_fn(public_name, proto, linkage, is_var_args, body)
+        .map(|_| ())
 }

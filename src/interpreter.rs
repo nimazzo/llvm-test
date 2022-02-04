@@ -22,7 +22,10 @@ impl Interpreter {
     }
 
     fn define_internal_functions(&mut self) {
-        let functions = [InternalFunction::PrintString];
+        let functions = [
+            InternalFunction::PrintString,
+            InternalFunction::PrintInteger,
+        ];
         for function in functions {
             match function {
                 InternalFunction::PrintString => {
@@ -38,6 +41,32 @@ impl Interpreter {
                         vec![ExprAST::new_variable(
                             "s".to_string(),
                             Some(ExprType::String),
+                            (0, 0),
+                            (0, 0),
+                        )],
+                        Some(ExprType::Integer),
+                        (0, 0),
+                        (0, 0),
+                    )
+                    .set_internal();
+                    self.functions.insert(
+                        "print".to_string(),
+                        FunctionAST::new(proto, body, (0, 0), (0, 0)),
+                    );
+                }
+                InternalFunction::PrintInteger => {
+                    let proto = PrototypeAST::new(
+                        "print".to_string(),
+                        vec![("n".to_string(), ExprType::Integer)],
+                        ExprType::Integer,
+                        (0, 0),
+                        (0, 0),
+                    );
+                    let body = ExprAST::new_function_call(
+                        "print".to_string(),
+                        vec![ExprAST::new_variable(
+                            "n".to_string(),
+                            Some(ExprType::Integer),
                             (0, 0),
                             (0, 0),
                         )],

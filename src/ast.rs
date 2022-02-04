@@ -1,3 +1,6 @@
+use crate::Compiler;
+use inkwell::types::AnyTypeEnum;
+use inkwell::AddressSpace;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
@@ -95,8 +98,8 @@ impl ExprVariant {
         match self {
             ExprVariant::Integer(_) => Some(ExprType::Integer),
             ExprVariant::String(_) => Some(ExprType::String),
-            ExprVariant::Variable { ty, .. } => *ty,
-            ExprVariant::FunctionCall { ty, .. } => *ty,
+            ExprVariant::Variable { ty, .. } => ty.clone(),
+            ExprVariant::FunctionCall { ty, .. } => ty.clone(),
             ExprVariant::BinaryExpr { lhs, .. } => lhs.variant.type_of(),
             ExprVariant::Sequence { rhs, .. } => rhs.variant.type_of(),
             ExprVariant::Nop => Some(ExprType::Void),
@@ -112,11 +115,11 @@ impl ExprVariant {
             ExprVariant::Integer(_) => Some(ExprType::Integer),
             ExprVariant::String(_) => Some(ExprType::String),
             ExprVariant::Variable { ident, ty } => match ty {
-                Some(t) => Some(*t),
+                Some(t) => Some(t.clone()),
                 None => {
                     match context.variables.get(ident).map(|t| {
-                        *ty = Some(*t);
-                        *t
+                        *ty = Some(t.clone());
+                        t.clone()
                     }) {
                         Some(t) => Some(t),
                         None => {
@@ -144,13 +147,13 @@ impl ExprVariant {
                 }
 
                 match ty {
-                    Some(t) => Some(*t),
+                    Some(t) => Some(t.clone()),
                     None => {
                         match context.functions.get(fn_name).map(|proto| {
-                            *ty = Some(proto.ty);
-                            proto.ty
+                            *ty = Some(proto.ty.clone());
+                            &proto.ty
                         }) {
-                            Some(t) => Some(t),
+                            Some(t) => Some(t.clone()),
                             None => {
                                 *unresolved += 1;
                                 None
@@ -315,16 +318,24 @@ pub enum BinOp {
     Div,
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Clone)]
 pub enum ExprType {
-    String,
     Integer,
+    String,
     Void,
+
+    // internal llvm types
+    I8,
+    I32,
+    Ptr {
+        inner_type: Box<ExprType>,
+        address_space: AddressSpace,
+    },
 }
 
 impl Debug for ExprType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
+        f.write_str(&self.as_str())
     }
 }
 
@@ -337,14 +348,16 @@ impl ExprType {
             _ => Err(()),
         }
     }
-}
 
-impl ExprType {
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> String {
         match self {
-            ExprType::String => "String",
-            ExprType::Integer => "int",
-            ExprType::Void => "void",
+            ExprType::String => "String".to_string(),
+            ExprType::Integer => "int".to_string(),
+            ExprType::Void => "void".to_string(),
+            // internal_llvm_types
+            ExprType::I8 => "i8".to_string(),
+            ExprType::I32 => "i32".to_string(),
+            ExprType::Ptr { inner_type, .. } => format!("{}*", inner_type.as_str()),
         }
     }
 }

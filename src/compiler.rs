@@ -2,18 +2,18 @@ use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, PrototypeA
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
-use inkwell::module::Module;
+use inkwell::module::{Linkage, Module};
 use inkwell::values::{
     BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue,
 };
 use std::collections::HashMap;
 use std::error::Error;
 
-use crate::error::{CompileError, CompileErrorType};
+use crate::error::CompileError;
 use crate::here;
 use crate::program::{CompiledFunction, CompiledProgram, ProgramBuilder};
 use anyhow::Result;
-use inkwell::types::{BasicMetadataTypeEnum, BasicTypeEnum};
+use inkwell::types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 use inkwell::{AddressSpace, OptimizationLevel};
 
 const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
@@ -58,14 +58,15 @@ impl<'ctx> Compiler<'ctx> {
         for node in ast {
             let (fun, params, ty) = match node {
                 ASTPrimitive::Extern(proto) => {
-                    let fun = self.compile_fn_prototype(proto)?;
-                    (fun, &proto.args, proto.ty)
+                    let proto = proto.clone();
+                    let fun = self.compile_fn_prototype(&proto)?;
+                    (fun, proto.args, proto.ty.clone())
                 }
                 ASTPrimitive::Function(fun) => {
-                    let proto = &fun.proto;
-                    let body = &fun.body;
-                    let fun = self.compile_fn(proto, body)?;
-                    (fun, &proto.args, proto.ty)
+                    let proto = fun.proto.clone();
+                    let body = fun.body.clone();
+                    let fun = self.compile_fn(&proto.name, proto.clone(), None, false, body)?;
+                    (fun, proto.args, proto.ty.clone())
                 }
             };
 
@@ -94,6 +95,7 @@ impl<'ctx> Compiler<'ctx> {
                 ExprType::Void => {
                     unreachable!("[CRITICAL ERROR] Function arguments can't have void type")
                 }
+                _ => todo!(""),
             })
             .map(|ty| ty.into())
             .collect::<Vec<BasicMetadataTypeEnum>>();
@@ -106,6 +108,7 @@ impl<'ctx> Compiler<'ctx> {
                 .fn_type(&args_types, false),
             ExprType::Integer => self.context.i32_type().fn_type(&args_types, false),
             ExprType::Void => self.context.void_type().fn_type(&args_types, false),
+            _ => todo!(""),
         };
 
         let fn_val = self.module.add_function(name, fn_type, None);
@@ -142,42 +145,42 @@ impl<'ctx> Compiler<'ctx> {
         Ok(())
     }
 
-    fn compile_fn(&mut self, proto: &PrototypeAST, body: &ExprAST) -> Result<FunctionValue<'ctx>> {
-        let function = self.compile_fn_prototype(proto)?;
-
-        self.alloc_fn_arguments(function, proto)?;
-
-        // compile function body
-        match self.compile_expr(body) {
-            Ok(body) => {
-                self.builder.build_return(Some(&body));
-            }
-            Err(e) => {
-                if let Some(CompileError {
-                    error_type: CompileErrorType::VoidReturn,
-                    ..
-                }) = e.downcast_ref::<CompileError>()
-                {
-                    self.builder.build_return(None);
-                } else {
-                    return Err(e);
-                }
-            }
-        }
-
-        // reset fn specific fields to default
-        self.curr_fn = None;
-        self.variables.clear();
-
-        if function.verify(true) {
-            Ok(function)
-        } else {
-            unsafe {
-                function.delete();
-            }
-            Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
-        }
-    }
+    // fn compile_fn(&mut self, proto: &PrototypeAST, body: &ExprAST) -> Result<FunctionValue<'ctx>> {
+    //     let function = self.compile_fn_prototype(proto)?;
+    //
+    //     self.alloc_fn_arguments(function, proto)?;
+    //
+    //     // compile function body
+    //     match self.compile_expr(body) {
+    //         Ok(body) => {
+    //             self.builder.build_return(Some(&body));
+    //         }
+    //         Err(e) => {
+    //             if let Some(CompileError {
+    //                 error_type: CompileErrorType::VoidReturn,
+    //                 ..
+    //             }) = e.downcast_ref::<CompileError>()
+    //             {
+    //                 self.builder.build_return(None);
+    //             } else {
+    //                 return Err(e);
+    //             }
+    //         }
+    //     }
+    //
+    //     // reset fn specific fields to default
+    //     self.curr_fn = None;
+    //     self.variables.clear();
+    //
+    //     if function.verify(true) {
+    //         Ok(function)
+    //     } else {
+    //         unsafe {
+    //             function.delete();
+    //         }
+    //         Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
+    //     }
+    // }
 
     pub fn create_entry_block_alloca(
         &self,
@@ -207,6 +210,62 @@ impl<'ctx> Compiler<'ctx> {
             _ => unreachable!(INTERNAL_ERROR),
         };
         Ok(builder.build_alloca(arg_type, name))
+    }
+
+    pub fn compile_fn(
+        &mut self,
+        public_name: &str,
+        proto: PrototypeAST,
+        linkage: Option<Linkage>,
+        is_var_args: bool,
+        body: ExprAST,
+    ) -> Result<FunctionValue> {
+        let function = {
+            let mut args_types = vec![];
+            for (_, arg) in &proto.args {
+                if let Ok(bte) = BasicTypeEnum::try_from(self.to_llvm_type(arg)) {
+                    args_types.push(BasicMetadataTypeEnum::from(bte));
+                } else {
+                    return Err(
+                        CompileError::generic_compilation_error("Invalid Type", here!()).into(),
+                    );
+                }
+            }
+
+            let ret_type = {
+                if let Ok(bt) = BasicTypeEnum::try_from(self.to_llvm_type(&proto.ty)) {
+                    bt
+                } else {
+                    return Err(
+                        CompileError::generic_compilation_error("Invalid Type", here!()).into(),
+                    );
+                }
+            };
+
+            let fn_type = ret_type.fn_type(&args_types, is_var_args);
+
+            self.module.add_function(&proto.name, fn_type, linkage)
+        };
+
+        // Compile function body
+        self.alloc_fn_arguments(function, &proto)?;
+
+        let compiled_body = self.compile_expr(&body)?;
+        self.builder.build_return(Some(&compiled_body));
+
+        // reset fn specific fields to default
+        self.curr_fn = None;
+        self.variables.clear();
+
+        if function.verify(true) {
+            self.functions.insert(public_name.to_string(), proto);
+            Ok(function)
+        } else {
+            unsafe {
+                function.delete();
+            }
+            Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
+        }
     }
 
     pub fn compile_expr(&self, expr: &ExprAST) -> Result<BasicValueEnum<'ctx>> {
@@ -264,6 +323,7 @@ impl<'ctx> Compiler<'ctx> {
                     ExprType::Void => {
                         return Err(CompileError::void_return(here!()).into());
                     }
+                    _ => todo!(""),
                 }
             }
             ExprVariant::BinaryExpr { op, lhs, rhs } => {
@@ -360,5 +420,28 @@ impl<'ctx> Compiler<'ctx> {
         let zero = self.context.i8_type().const_zero();
         let pp = unsafe { self.builder.build_gep(ptr, &[zero, zero], "gep") };
         Ok(BasicValueEnum::from(pp))
+    }
+
+    fn to_llvm_type(&self, ty: &ExprType) -> AnyTypeEnum<'ctx> {
+        match ty {
+            ExprType::I8 => AnyTypeEnum::from(self.context.i8_type()),
+            ExprType::I32 => AnyTypeEnum::from(self.context.i32_type()),
+            ExprType::Ptr {
+                inner_type,
+                address_space,
+            } => match inner_type.as_ref() {
+                ExprType::I8 => AnyTypeEnum::from(self.context.i8_type().ptr_type(*address_space)),
+                ExprType::I32 => {
+                    AnyTypeEnum::from(self.context.i32_type().ptr_type(*address_space))
+                }
+                _ => unimplemented!("Chained Pointer Types are not defined yet"),
+            },
+            ExprType::Integer => self.to_llvm_type(&ExprType::I32),
+            ExprType::String => self.to_llvm_type(&ExprType::Ptr {
+                inner_type: Box::new(ExprType::I8),
+                address_space: AddressSpace::Generic,
+            }),
+            ExprType::Void => AnyTypeEnum::from(self.context.void_type()),
+        }
     }
 }

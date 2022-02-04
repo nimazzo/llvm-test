@@ -84,8 +84,8 @@ impl<'a> TypeChecker<'a> {
                     .with_pos(fun.proto.pos)
                     .into());
                 }
-                let ret_type = fun.proto.ty;
-                if ret_type != ExprType::Integer {
+                let ret_type = &fun.proto.ty;
+                if *ret_type != ExprType::Integer {
                     let context = optionize(fun.proto.context);
                     return Err(ParseError::wrong_main_function_signature(
                         self.lexer.get_context(context),
@@ -174,8 +174,8 @@ impl<'a> TypeChecker<'a> {
                         let context = optionize(fun.proto.context);
                         return Err(ParseError::unexpected_type(
                             self.lexer.get_context(context),
-                            fun.proto.ty.as_str(),
-                            body_type.as_str(),
+                            &fun.proto.ty.as_str(),
+                            &body_type.as_str(),
                             here!(),
                         )
                         .with_pos(fun.proto.pos)
@@ -224,8 +224,8 @@ impl<'a> TypeChecker<'a> {
                         let context = optionize(expr.context);
                         return Err(ParseError::unexpected_type(
                             self.lexer.get_context(context),
-                            expected.as_str(),
-                            arg_type.as_str(),
+                            &expected.as_str(),
+                            &arg_type.as_str(),
                             here!(),
                         )
                         .with_pos(expr.pos)
@@ -244,8 +244,8 @@ impl<'a> TypeChecker<'a> {
                         let context = optionize(expr.context);
                         Err(ParseError::unexpected_type(
                             self.lexer.get_context(context),
-                            left_type.as_str(),
-                            right_type.as_str(),
+                            &left_type.as_str(),
+                            &right_type.as_str(),
                             here!(),
                         )
                         .with_pos(expr.pos)
