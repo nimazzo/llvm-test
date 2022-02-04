@@ -1,4 +1,4 @@
-use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, PrototypeAST, AST};
+use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, PrototypeAST, AST};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
@@ -210,20 +210,20 @@ impl<'ctx> Compiler<'ctx> {
     }
 
     pub fn compile_expr(&self, expr: &ExprAST) -> Result<BasicValueEnum<'ctx>> {
-        let value = match expr {
-            ExprAST::Integer(value) => self
+        let value = match &expr.variant {
+            ExprVariant::Integer(value) => self
                 .context
                 .i32_type()
                 .const_int(*value as u64, true)
                 .into(),
-            ExprAST::String(s) => self.compile_string(s)?,
-            ExprAST::Variable { ident, .. } => match self.variables.get(ident) {
+            ExprVariant::String(s) => self.compile_string(s)?,
+            ExprVariant::Variable { ident, .. } => match self.variables.get(ident) {
                 Some(ptr) => self.builder.build_load(*ptr, ident),
                 None => {
                     return Err(CompileError::unknown_variable(ident, here!()).into());
                 }
             },
-            ExprAST::FunctionCall {
+            ExprVariant::FunctionCall {
                 fn_name,
                 args,
                 internal,
@@ -266,7 +266,7 @@ impl<'ctx> Compiler<'ctx> {
                     }
                 }
             }
-            ExprAST::BinaryExpr { op, lhs, rhs } => {
+            ExprVariant::BinaryExpr { op, lhs, rhs } => {
                 let lhs = self.compile_expr(lhs)?;
                 let rhs = self.compile_expr(rhs)?;
                 match op {
@@ -276,11 +276,11 @@ impl<'ctx> Compiler<'ctx> {
                     BinOp::Div => self.compile_div(lhs, rhs),
                 }
             }
-            ExprAST::Sequence { lhs, rhs } => {
+            ExprVariant::Sequence { lhs, rhs } => {
                 self.compile_expr(lhs)?;
                 self.compile_expr(rhs)?
             }
-            ExprAST::Nop => {
+            ExprVariant::Nop => {
                 return Err(CompileError::void_return(here!()).into());
             }
         };

@@ -1,4 +1,6 @@
-use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, FunctionAST, PrototypeAST, AST};
+use crate::ast::{
+    ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, PrototypeAST, AST,
+};
 use crate::core::InternalFunction;
 use crate::interpreter::ExprResult::Number;
 use crate::Console;
@@ -28,18 +30,21 @@ impl Interpreter {
                         "print".to_string(),
                         vec![("s".to_string(), ExprType::String)],
                         ExprType::Integer,
+                        (0, 0),
                     );
                     let body = ExprAST::new_function_call(
                         "print".to_string(),
                         vec![ExprAST::new_variable(
                             "s".to_string(),
                             Some(ExprType::String),
+                            (0, 0),
                         )],
                         Some(ExprType::Integer),
+                        (0, 0),
                     )
                     .set_internal();
                     self.functions
-                        .insert("print".to_string(), FunctionAST::new(proto, body));
+                        .insert("print".to_string(), FunctionAST::new(proto, body, (0, 0)));
                 }
             }
         }
@@ -114,30 +119,30 @@ impl Interpreter {
     }
 
     fn eval_expr(&self, expr: &ExprAST, local_variables: &HashMap<String, ExprAST>) -> ExprResult {
-        match expr {
-            ExprAST::Integer(value) => ExprResult::Number(*value),
-            ExprAST::String(s) => ExprResult::String(s.clone()),
-            ExprAST::Variable { ident, .. } => {
+        match &expr.variant {
+            ExprVariant::Integer(value) => ExprResult::Number(*value),
+            ExprVariant::String(s) => ExprResult::String(s.clone()),
+            ExprVariant::Variable { ident, .. } => {
                 let expr = local_variables.get(ident).expect(INTERNAL_ERROR);
                 self.eval_expr(expr, local_variables)
             }
-            ExprAST::FunctionCall {
+            ExprVariant::FunctionCall {
                 fn_name,
                 args,
                 internal,
                 ..
             } => self.eval_function_call(fn_name, args, *internal, local_variables),
-            ExprAST::BinaryExpr { op, lhs, rhs } => match op {
+            ExprVariant::BinaryExpr { op, lhs, rhs } => match op {
                 BinOp::Add => self.eval_add(lhs, rhs, local_variables),
                 BinOp::Minus => self.eval_minus(lhs, rhs, local_variables),
                 BinOp::Mul => self.eval_mul(lhs, rhs, local_variables),
                 BinOp::Div => self.eval_div(lhs, rhs, local_variables),
             },
-            ExprAST::Sequence { lhs, rhs } => {
+            ExprVariant::Sequence { lhs, rhs } => {
                 self.eval_expr(lhs, local_variables);
                 self.eval_expr(rhs, local_variables)
             }
-            ExprAST::Nop => ExprResult::Null,
+            ExprVariant::Nop => ExprResult::Null,
         }
     }
 

@@ -44,29 +44,31 @@ impl Lexer {
         token
     }
 
-    pub fn get_token_idx(&self) -> (Option<usize>, Option<usize>) {
-        (Some(self.idx_token_start), Some(self.idx))
+    pub fn get_token_idx(&self) -> (usize, usize) {
+        (self.idx_token_start, self.idx)
     }
 
     pub fn get_context(&self, idx: (Option<usize>, Option<usize>)) -> String {
+        // todo: consider rewriting this whole thing
         let start = idx.0.unwrap_or(self.idx_token_start);
         let end = idx.1.unwrap_or(self.idx);
 
         let mut context = String::new();
 
-        // todo: might want to hide unrelated lines in the beginning
+        // context before error
         for c in self.input.iter().take(start) {
             context.push(*c);
         }
 
+        // mark error red
         let mut current_token = String::new();
         for c in self.input.iter().skip(start).take(end - start) {
             current_token.push(*c);
         }
-
         context.push_str(&ansi_term::Color::Red.paint(current_token).to_string());
 
-        for c in self.input.iter().skip(end).take(30) {
+        // context after error
+        for c in self.input.iter().skip(end) {
             context.push(*c);
         }
 

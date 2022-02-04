@@ -37,11 +37,22 @@ pub struct PrototypeAST {
     pub name: String,
     pub args: Vec<(String, ExprType)>,
     pub ty: ExprType,
+    pub context: (usize, usize),
 }
 
 impl PrototypeAST {
-    pub fn new(name: String, args: Vec<(String, ExprType)>, ty: ExprType) -> Self {
-        Self { name, args, ty }
+    pub fn new(
+        name: String,
+        args: Vec<(String, ExprType)>,
+        ty: ExprType,
+        context: (usize, usize),
+    ) -> Self {
+        Self {
+            name,
+            args,
+            ty,
+            context,
+        }
     }
 }
 
@@ -49,81 +60,35 @@ impl PrototypeAST {
 pub struct FunctionAST {
     pub proto: PrototypeAST,
     pub body: ExprAST,
+    pub context: (usize, usize),
 }
 
 impl FunctionAST {
-    pub fn new(proto: PrototypeAST, body: ExprAST) -> Self {
-        Self { proto, body }
+    pub fn new(proto: PrototypeAST, body: ExprAST, context: (usize, usize)) -> Self {
+        Self {
+            proto,
+            body,
+            context,
+        }
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum ExprAST {
-    Integer(i32),
-    String(String),
-    Variable {
-        ident: String,
-        ty: Option<ExprType>,
-    },
-    FunctionCall {
-        fn_name: String,
-        args: Vec<ExprAST>,
-        ty: Option<ExprType>,
-        internal: bool,
-    },
-    BinaryExpr {
-        op: BinOp,
-        lhs: Box<ExprAST>,
-        rhs: Box<ExprAST>,
-    },
-    Sequence {
-        lhs: Box<ExprAST>,
-        rhs: Box<ExprAST>,
-    },
-    Nop,
+pub struct ExprAST {
+    pub variant: ExprVariant,
+    pub context: (usize, usize),
 }
 
-impl ExprAST {
-    pub fn new_binary_expr(op: BinOp, lhs: Box<ExprAST>, rhs: Box<ExprAST>) -> Self {
-        Self::BinaryExpr { op, lhs, rhs }
-    }
-
-    pub fn new_sequence(lhs: Box<ExprAST>, rhs: Box<ExprAST>) -> Self {
-        Self::Sequence { lhs, rhs }
-    }
-
-    pub fn new_function_call(fn_name: String, args: Vec<ExprAST>, ty: Option<ExprType>) -> Self {
-        Self::FunctionCall {
-            fn_name,
-            args,
-            ty,
-            internal: false,
-        }
-    }
-
-    pub fn set_internal(mut self) -> Self {
-        if let ExprAST::FunctionCall {
-            ref mut internal, ..
-        } = self
-        {
-            *internal = true;
-        }
-        self
-    }
-
-    pub fn new_variable(ident: String, ty: Option<ExprType>) -> Self {
-        Self::Variable { ident, ty }
-    }
-
+impl ExprVariant {
     pub fn type_of(&self) -> Option<ExprType> {
         match self {
-            ExprAST::Integer(_) => Some(ExprType::Integer),
-            ExprAST::String(_) => Some(ExprType::String),
-            ExprAST::Variable { ty, .. } => *ty,
-            ExprAST::FunctionCall { ty, .. } => *ty,
-            ExprAST::BinaryExpr { lhs, .. } => lhs.type_of(),
-            ExprAST::Sequence { rhs, .. } => rhs.type_of(),
-            ExprAST::Nop => Some(ExprType::Void),
+            ExprVariant::Integer(_) => Some(ExprType::Integer),
+            ExprVariant::String(_) => Some(ExprType::String),
+            ExprVariant::Variable { ty, .. } => *ty,
+            ExprVariant::FunctionCall { ty, .. } => *ty,
+            ExprVariant::BinaryExpr { lhs, .. } => lhs.variant.type_of(),
+            ExprVariant::Sequence { rhs, .. } => rhs.variant.type_of(),
+            ExprVariant::Nop => Some(ExprType::Void),
         }
     }
 
@@ -133,9 +98,9 @@ impl ExprAST {
         unresolved: &mut usize,
     ) -> Option<ExprType> {
         match self {
-            ExprAST::Integer(_) => Some(ExprType::Integer),
-            ExprAST::String(_) => Some(ExprType::String),
-            ExprAST::Variable { ident, ty } => match ty {
+            ExprVariant::Integer(_) => Some(ExprType::Integer),
+            ExprVariant::String(_) => Some(ExprType::String),
+            ExprVariant::Variable { ident, ty } => match ty {
                 Some(t) => Some(*t),
                 None => {
                     match context.variables.get(ident).map(|t| {
@@ -150,12 +115,12 @@ impl ExprAST {
                     }
                 }
             },
-            ExprAST::FunctionCall {
+            ExprVariant::FunctionCall {
                 fn_name, args, ty, ..
             } => {
                 let resolved_args = args
                     .iter_mut()
-                    .filter_map(|arg| match arg.resolve_type(context, unresolved) {
+                    .filter_map(|arg| match arg.variant.resolve_type(context, unresolved) {
                         Some(t) => Some(t),
                         None => {
                             *unresolved += 1;
@@ -183,27 +148,131 @@ impl ExprAST {
                     }
                 }
             }
-            ExprAST::BinaryExpr { op, lhs, rhs } => match op {
+            ExprVariant::BinaryExpr { op, lhs, rhs } => match op {
                 BinOp::Add | BinOp::Minus | BinOp::Mul | BinOp::Div => lhs
+                    .variant
                     .resolve_type(context, unresolved)
-                    .and(rhs.resolve_type(context, unresolved)),
+                    .and(rhs.variant.resolve_type(context, unresolved)),
             },
-            ExprAST::Sequence { lhs, rhs, .. } => lhs
+            ExprVariant::Sequence { lhs, rhs, .. } => lhs
+                .variant
                 .resolve_type(context, unresolved)
-                .and(rhs.resolve_type(context, unresolved)),
-            ExprAST::Nop => Some(ExprType::Void),
+                .and(rhs.variant.resolve_type(context, unresolved)),
+            ExprVariant::Nop => Some(ExprType::Void),
         }
     }
 
     pub fn requires_semicolon(&self) -> bool {
         match self {
-            ExprAST::Integer(_) => true,
-            ExprAST::String(_) => true,
-            ExprAST::Variable { .. } => true,
-            ExprAST::FunctionCall { .. } => true,
-            ExprAST::BinaryExpr { .. } => true,
-            ExprAST::Sequence { rhs, .. } => rhs.requires_semicolon(),
-            ExprAST::Nop => false,
+            ExprVariant::Integer(_) => true,
+            ExprVariant::String(_) => true,
+            ExprVariant::Variable { .. } => true,
+            ExprVariant::FunctionCall { .. } => true,
+            ExprVariant::BinaryExpr { .. } => true,
+            ExprVariant::Sequence { rhs, .. } => rhs.variant.requires_semicolon(),
+            ExprVariant::Nop => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ExprVariant {
+    Integer(i32),
+    String(String),
+    Variable {
+        ident: String,
+        ty: Option<ExprType>,
+    },
+    FunctionCall {
+        fn_name: String,
+        args: Vec<ExprAST>,
+        ty: Option<ExprType>,
+        internal: bool,
+    },
+    BinaryExpr {
+        op: BinOp,
+        lhs: Box<ExprAST>,
+        rhs: Box<ExprAST>,
+    },
+    Sequence {
+        lhs: Box<ExprAST>,
+        rhs: Box<ExprAST>,
+    },
+    Nop,
+}
+
+impl ExprAST {
+    pub fn new_binary_expr(
+        op: BinOp,
+        lhs: Box<ExprAST>,
+        rhs: Box<ExprAST>,
+        context: (usize, usize),
+    ) -> Self {
+        Self {
+            variant: ExprVariant::BinaryExpr { op, lhs, rhs },
+            context,
+        }
+    }
+
+    pub fn new_string(s: String, context: (usize, usize)) -> Self {
+        Self {
+            variant: ExprVariant::String(s),
+            context,
+        }
+    }
+
+    pub fn new_integer(n: i32, context: (usize, usize)) -> Self {
+        Self {
+            variant: ExprVariant::Integer(n),
+            context,
+        }
+    }
+
+    pub fn new_nop(context: (usize, usize)) -> Self {
+        Self {
+            variant: ExprVariant::Nop,
+            context,
+        }
+    }
+
+    pub fn new_sequence(lhs: Box<ExprAST>, rhs: Box<ExprAST>, context: (usize, usize)) -> Self {
+        Self {
+            variant: ExprVariant::Sequence { lhs, rhs },
+            context,
+        }
+    }
+
+    pub fn new_function_call(
+        fn_name: String,
+        args: Vec<ExprAST>,
+        ty: Option<ExprType>,
+        context: (usize, usize),
+    ) -> Self {
+        Self {
+            variant: ExprVariant::FunctionCall {
+                fn_name,
+                args,
+                ty,
+                internal: false,
+            },
+            context,
+        }
+    }
+
+    pub fn set_internal(mut self) -> Self {
+        if let ExprVariant::FunctionCall {
+            ref mut internal, ..
+        } = self.variant
+        {
+            *internal = true;
+        }
+        self
+    }
+
+    pub fn new_variable(ident: String, ty: Option<ExprType>, context: (usize, usize)) -> Self {
+        Self {
+            variant: ExprVariant::Variable { ident, ty },
+            context,
         }
     }
 }

@@ -1,10 +1,10 @@
 // fn main()
 
 fn add(a: int, b: int) -> int {
-    a + b;
+    a + "b";
 }
 
 fn main() -> int {
     print("This is native code in my own language WOW!");
-    add(40, 2);
+    add(1, 2);
 }

@@ -1,23 +1,26 @@
 use crate::ast::{
-    ASTPrimitive, BinOp, ExprAST, ExprType, FunctionAST, PrototypeAST, TypeContext, AST,
+    ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, PrototypeAST, TypeContext,
+    AST,
 };
 use crate::error::ParseError;
-use crate::{here, CompileError, Console};
+use crate::{here, Console, Lexer};
 use anyhow::Result;
 use std::collections::HashMap;
 
-pub struct TypeChecker {
+pub struct TypeChecker<'a> {
     context: TypeContext,
     console: Console,
+    lexer: &'a Lexer,
 }
 
 const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
 
-impl TypeChecker {
-    pub fn new(console: Console) -> Self {
+impl<'a> TypeChecker<'a> {
+    pub fn new(console: Console, lexer: &'a Lexer) -> Self {
         Self {
             context: TypeContext::new(),
             console,
+            lexer,
         }
     }
 
@@ -53,8 +56,9 @@ impl TypeChecker {
                 main_function = Some(fun);
             }
             if let Some(old) = functions.insert(fun.proto.name.clone(), fun.proto.clone()) {
+                let context = optionize(fun.context);
                 return Err(ParseError::duplicate_function_definition(
-                    "TODO".to_string(),
+                    self.lexer.get_context(context),
                     &old.name,
                     here!(),
                 )
@@ -66,8 +70,9 @@ impl TypeChecker {
             Some(fun) => {
                 let arg_count = fun.proto.args.len();
                 if arg_count != 0 {
+                    let context = optionize(fun.proto.context);
                     return Err(ParseError::wrong_main_function_signature(
-                        "TODO".to_string(),
+                        self.lexer.get_context(context),
                         &format!(
                             "Main Function expects '0' parameters, found '{}'",
                             arg_count
@@ -78,8 +83,9 @@ impl TypeChecker {
                 }
                 let ret_type = fun.proto.ty;
                 if ret_type != ExprType::Integer {
+                    let context = optionize(fun.proto.context);
                     return Err(ParseError::wrong_main_function_signature(
-                        "TODO".to_string(),
+                        self.lexer.get_context(context),
                         &format!("Return Type must be 'int', found '{}'", ret_type.as_str()),
                         here!(),
                     )
@@ -87,7 +93,7 @@ impl TypeChecker {
                 }
             }
             None => {
-                return Err(ParseError::missing_main("TODO".to_string(), here!()).into());
+                return Err(ParseError::missing_main("".to_string(), here!()).into());
             }
         }
 
@@ -120,24 +126,33 @@ impl TypeChecker {
                 break;
             }
 
+            self.console.println(format!(
+                "[Type Checker] Round {}: {} Unresolved Symbols Left",
+                round, unresolved
+            ));
+
             if unresolved == last_unresolved {
-                return Err(CompileError::generic_compilation_error(
-                    "Infinite Loop during Type Resolving",
+                let unresolved_symbol = unresolved_functions
+                    .into_iter()
+                    .map(|v| &v.body)
+                    .filter_map(get_unresolved_symbol)
+                    .next()
+                    .expect(INTERNAL_ERROR);
+
+                let context = optionize(unresolved_symbol.context);
+                return Err(ParseError::unknown_type(
+                    self.lexer.get_context(context),
+                    "Cannot resolve type of symbol",
                     here!(),
                 )
                 .into());
             }
             last_unresolved = unresolved;
-            self.console.println(format!(
-                "[Type Checker] Round {}: {} Unresolved Symbols Left",
-                round, last_unresolved
-            ));
             round += 1;
         }
         Ok(())
     }
 
-    // todo: add context to errors
     fn check_types(&self, ast: &AST) -> Result<()> {
         self.console
             .println("[Type Checker] Starting Type Checking Process");
@@ -149,10 +164,11 @@ impl TypeChecker {
                 ASTPrimitive::Function(fun) => {
                     self.check_fn_proto_types(&fun.proto)?;
                     self.check_expr_types(&fun.body)?;
-                    let body_type = fun.body.type_of().expect(INTERNAL_ERROR);
+                    let body_type = fun.body.variant.type_of().expect(INTERNAL_ERROR);
                     if body_type != fun.proto.ty {
+                        let context = optionize(fun.proto.context);
                         return Err(ParseError::unexpected_type(
-                            "TODO".to_string(),
+                            self.lexer.get_context(context),
                             fun.proto.ty.as_str(),
                             body_type.as_str(),
                             here!(),
@@ -168,8 +184,9 @@ impl TypeChecker {
     fn check_fn_proto_types(&self, proto: &PrototypeAST) -> Result<()> {
         for (_, arg_type) in &proto.args {
             if *arg_type == ExprType::Void {
+                let context = optionize(proto.context);
                 return Err(ParseError::illegal_type(
-                    "TODO".to_string(),
+                    self.lexer.get_context(context),
                     "void type not allowed as function arguments",
                     here!(),
                 )
@@ -180,12 +197,13 @@ impl TypeChecker {
     }
 
     fn check_expr_types(&self, expr: &ExprAST) -> Result<()> {
-        match expr {
-            ExprAST::FunctionCall { fn_name, args, .. } => {
+        match &expr.variant {
+            ExprVariant::FunctionCall { fn_name, args, .. } => {
                 let proto = self.context.functions.get(fn_name).expect(INTERNAL_ERROR);
                 if args.len() != proto.args.len() {
+                    let context = optionize(expr.context);
                     return Err(ParseError::wrong_argument_count(
-                        "TODO".to_string(),
+                        self.lexer.get_context(context),
                         proto.args.len(),
                         args.len(),
                         here!(),
@@ -193,10 +211,11 @@ impl TypeChecker {
                     .into());
                 }
                 for (arg, (_, expected)) in args.iter().zip(proto.args.iter()) {
-                    let arg_type = arg.type_of().expect(INTERNAL_ERROR);
+                    let arg_type = arg.variant.type_of().expect(INTERNAL_ERROR);
                     if arg_type != *expected {
+                        let context = optionize(expr.context);
                         return Err(ParseError::unexpected_type(
-                            "TODO".to_string(),
+                            self.lexer.get_context(context),
                             expected.as_str(),
                             arg_type.as_str(),
                             here!(),
@@ -206,15 +225,16 @@ impl TypeChecker {
                 }
                 Ok(())
             }
-            ExprAST::BinaryExpr { op, lhs, rhs } => match op {
+            ExprVariant::BinaryExpr { op, lhs, rhs } => match op {
                 BinOp::Add | BinOp::Minus | BinOp::Mul | BinOp::Div => {
-                    let left_type = lhs.type_of().expect(INTERNAL_ERROR);
-                    let right_type = rhs.type_of().expect(INTERNAL_ERROR);
+                    let left_type = lhs.variant.type_of().expect(INTERNAL_ERROR);
+                    let right_type = rhs.variant.type_of().expect(INTERNAL_ERROR);
                     if left_type == right_type {
                         Ok(())
                     } else {
+                        let context = optionize(expr.context);
                         Err(ParseError::unexpected_type(
-                            "TODO".to_string(),
+                            self.lexer.get_context(context),
                             left_type.as_str(),
                             right_type.as_str(),
                             here!(),
@@ -223,7 +243,7 @@ impl TypeChecker {
                     }
                 }
             },
-            ExprAST::Sequence { lhs, rhs } => {
+            ExprVariant::Sequence { lhs, rhs } => {
                 self.check_expr_types(lhs).and(self.check_expr_types(rhs))
             }
             _ => Ok(()),
@@ -238,15 +258,19 @@ impl TypeChecker {
             .cloned()
             .collect::<HashMap<String, ExprType>>();
         self.context.add_variables(local_variables);
-        fun.body.resolve_type(&self.context, unresolved).is_some()
+        fun.body
+            .variant
+            .resolve_type(&self.context, unresolved)
+            .is_some()
     }
 
     fn assert_all_types_resolved(&self, ast: &AST) -> Result<()> {
         for node in ast {
             if let ASTPrimitive::Function(fun) = node {
-                if !self.is_resolved(&fun.body) {
+                if !is_resolved(&fun.body) {
+                    let context = optionize(fun.body.context);
                     return Err(ParseError::unknown_type(
-                        "TODO".to_string(),
+                        self.lexer.get_context(context),
                         "Could not resolve type (this is an internal compiler error)",
                         here!(),
                     )
@@ -258,16 +282,48 @@ impl TypeChecker {
             .println("[Type Checker] All types successfully resolved");
         Ok(())
     }
+}
 
-    fn is_resolved(&self, expr: &ExprAST) -> bool {
-        match expr {
-            ExprAST::Integer(_) => true,
-            ExprAST::String(_) => true,
-            ExprAST::Variable { ty, .. } => ty.is_some(),
-            ExprAST::FunctionCall { ty, .. } => ty.is_some(),
-            ExprAST::BinaryExpr { lhs, rhs, .. } => self.is_resolved(lhs) && self.is_resolved(rhs),
-            ExprAST::Sequence { lhs, rhs } => self.is_resolved(lhs) && self.is_resolved(rhs),
-            ExprAST::Nop => true,
+fn optionize(context: (usize, usize)) -> (Option<usize>, Option<usize>) {
+    (Some(context.0), Some(context.1))
+}
+
+fn is_resolved(expr: &ExprAST) -> bool {
+    match &expr.variant {
+        ExprVariant::Integer(_) => true,
+        ExprVariant::String(_) => true,
+        ExprVariant::Variable { ty, .. } => ty.is_some(),
+        ExprVariant::FunctionCall { ty, .. } => ty.is_some(),
+        ExprVariant::BinaryExpr { lhs, rhs, .. } => is_resolved(lhs) && is_resolved(rhs),
+        ExprVariant::Sequence { lhs, rhs } => is_resolved(lhs) && is_resolved(rhs),
+        ExprVariant::Nop => true,
+    }
+}
+
+fn get_unresolved_symbol(expr: &ExprAST) -> Option<ExprAST> {
+    match &expr.variant {
+        ExprVariant::Integer(_) => None,
+        ExprVariant::String(_) => None,
+        ExprVariant::Variable { ty, .. } => {
+            if ty.is_none() {
+                Some(expr.clone())
+            } else {
+                None
+            }
         }
+        ExprVariant::FunctionCall { ty, .. } => {
+            if ty.is_none() {
+                Some(expr.clone())
+            } else {
+                None
+            }
+        }
+        ExprVariant::BinaryExpr { lhs, rhs, .. } => {
+            get_unresolved_symbol(lhs).or_else(|| get_unresolved_symbol(rhs))
+        }
+        ExprVariant::Sequence { lhs, rhs } => {
+            get_unresolved_symbol(lhs).or_else(|| get_unresolved_symbol(rhs))
+        }
+        ExprVariant::Nop => None,
     }
 }

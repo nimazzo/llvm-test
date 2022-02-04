@@ -182,14 +182,14 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
 
     // AST Generation: Lexer + Parser
     start_timer!(timer, "Lexer + Parser", cli.time);
-    let lexer = Lexer::new(&input, console);
-    let mut parser = parser::Parser::new(lexer, console);
+    let mut lexer = Lexer::new(&input, console);
+    let mut parser = parser::Parser::new(&mut lexer, console);
     let mut ast = parser.parse()?;
     stop_timer!(timer, cli.time);
 
     // AST Type Checking
     start_timer!(timer, "Type Checker", cli.time);
-    let mut type_checker = TypeChecker::new(console);
+    let mut type_checker = TypeChecker::new(console, &lexer);
     type_checker.run(&mut ast)?;
     stop_timer!(timer, cli.time);
 

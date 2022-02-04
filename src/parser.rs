@@ -82,14 +82,14 @@ macro_rules! skip_whitespace_and_comments {
     }};
 }
 
-pub struct Parser {
-    lexer: Lexer,
+pub struct Parser<'a> {
+    lexer: &'a mut Lexer,
     current_token: Token,
     console: Console,
 }
 
-impl Parser {
-    pub fn new(mut lexer: Lexer, console: Console) -> Self {
+impl<'a> Parser<'a> {
+    pub fn new(lexer: &'a mut Lexer, console: Console) -> Self {
         let token = lexer.next_token();
         Self {
             lexer,
@@ -132,17 +132,20 @@ impl Parser {
     fn parse_function(&mut self) -> Result<FunctionAST> {
         self.console
             .println_verbose("[Parser] Trying to parse function");
+        let (context_start, _) = self.lexer.get_token_idx();
         let proto = self.parse_function_prototype()?;
         let body = self.parse_function_body()?;
+        let (_, context_end) = self.lexer.get_token_idx();
 
         self.console
             .println_verbose("[Parser] Successfully parsed function");
-        Ok(FunctionAST::new(proto, body))
+        Ok(FunctionAST::new(proto, body, (context_start, context_end)))
     }
 
     fn parse_function_prototype(&mut self) -> Result<PrototypeAST> {
         self.console
             .println_verbose("[Parser] Trying to parse function prototype");
+        let (context_start, _) = self.lexer.get_token_idx();
         parse!(self, TokenType::Fn)?;
         let function_name = parse_identifier!(self)?;
 
@@ -151,16 +154,23 @@ impl Parser {
 
         // Parse function return type
         let ret_type = self.parse_function_return_type()?;
+        let (_, context_end) = self.lexer.get_token_idx();
 
         self.console
             .println_verbose("[Parser] Successfully parsed function prototype");
-        Ok(PrototypeAST::new(function_name, function_args, ret_type))
+        Ok(PrototypeAST::new(
+            function_name,
+            function_args,
+            ret_type,
+            (context_start, context_end),
+        ))
     }
 
     fn parse_function_return_type(&mut self) -> Result<ExprType> {
         parse!(self, TokenType::RightArrow)?;
         skip_whitespace_and_comments!(self);
         let idx = self.current_token.idx;
+        let idx = (Some(idx.0), Some(idx.1));
         let pos = self.current_token.pos;
         let type_ident = parse_identifier!(self)?;
 
@@ -180,6 +190,7 @@ impl Parser {
                 parse!(self, TokenType::Colon)?;
                 skip_whitespace_and_comments!(self);
                 let idx = self.current_token.idx;
+                let idx = (Some(idx.0), Some(idx.1));
                 let pos = self.current_token.pos;
                 let type_ident = parse_identifier!(self)?;
                 function_args.push((
@@ -208,13 +219,13 @@ impl Parser {
         // Function has empty body
         if peek!(self) == TokenType::RightCurly {
             parse!(self, TokenType::RightCurly)?;
-            return Ok(ExprAST::Nop);
+            return Ok(ExprAST::new_nop((0, 0)));
         }
 
         let mut expressions = vec![];
         loop {
             let body = self.parse_expression()?;
-            if body.requires_semicolon() {
+            if body.variant.requires_semicolon() {
                 parse!(self, TokenType::Semicolon)?;
             }
             expressions.push(body);
@@ -239,7 +250,13 @@ impl Parser {
             _ => {
                 let first = expressions.remove(0);
                 let second = self.parse_sequence(expressions)?;
-                Ok(ExprAST::new_sequence(Box::new(first), Box::new(second)))
+                let (context_start, context_end) = (first.context.0, second.context.1);
+                let context = (context_start, context_end);
+                Ok(ExprAST::new_sequence(
+                    Box::new(first),
+                    Box::new(second),
+                    context,
+                ))
             }
         }
     }
@@ -249,10 +266,11 @@ impl Parser {
         self.console
             .println_verbose("[Parser] Trying to parse top level expression");
 
+        let (context_start, _) = self.lexer.get_token_idx();
         let mut expressions = vec![];
         loop {
             let body = self.parse_expression()?;
-            if body.requires_semicolon() {
+            if body.variant.requires_semicolon() {
                 parse!(self, TokenType::Semicolon)?;
             }
             expressions.push(body);
@@ -261,14 +279,20 @@ impl Parser {
                 _ => {}
             }
         }
-        expressions.push(ExprAST::Nop);
+        let (_, context_end) = self.lexer.get_token_idx();
+        expressions.push(ExprAST::new_nop((0, 0)));
 
         let body = self.parse_sequence(expressions)?;
 
-        let proto = PrototypeAST::new(ANONYMOUS_FUNCTION_NAME.into(), vec![], ExprType::Void);
+        let proto = PrototypeAST::new(
+            ANONYMOUS_FUNCTION_NAME.into(),
+            vec![],
+            ExprType::Void,
+            (0, 0),
+        );
         self.console
             .println_verbose("[Parser] Successfully parsed top level expression");
-        Ok(FunctionAST::new(proto, body))
+        Ok(FunctionAST::new(proto, body, (context_start, context_end)))
     }
 
     fn parse_expression(&mut self) -> Result<ExprAST> {
@@ -302,18 +326,25 @@ impl Parser {
     }
 
     fn parse_identifier(&mut self) -> Result<ExprAST> {
+        let context_start = self.lexer.get_token_idx().0;
         let ident = parse_identifier!(self)?;
         if peek!(self) == TokenType::LeftParen {
-            self.parse_function_call(ident)
+            let call_args = self.parse_call_arguments()?;
+            let context_end = self.lexer.get_token_idx().1;
+            Ok(ExprAST::new_function_call(
+                ident,
+                call_args,
+                None,
+                (context_start, context_end),
+            ))
         } else {
-            Ok(ExprAST::new_variable(ident, None))
+            let context_end = self.lexer.get_token_idx().1;
+            Ok(ExprAST::new_variable(
+                ident,
+                None,
+                (context_start, context_end),
+            ))
         }
-    }
-
-    fn parse_function_call(&mut self, fn_name: String) -> Result<ExprAST> {
-        let call_args = self.parse_call_arguments()?;
-        let fn_call = ExprAST::new_function_call(fn_name, call_args, None);
-        Ok(fn_call)
     }
 
     fn parse_call_arguments(&mut self) -> Result<Vec<ExprAST>> {
@@ -347,7 +378,7 @@ impl Parser {
                 TokenType::DoubleQuotes => break,
                 TokenType::Eof => {
                     return Err(ParseError::unexpected_eof(
-                        self.lexer.get_context((start, None)),
+                        self.lexer.get_context((Some(start), None)),
                         here!(),
                     )
                     .with_pos(pos)
@@ -357,13 +388,13 @@ impl Parser {
             }
             self.advance_token();
         }
-        parse!(self, TokenType::DoubleQuotes)?;
+        let end = parse!(self, TokenType::DoubleQuotes)?.idx.1;
 
-        Ok(ExprAST::String(result))
+        Ok(ExprAST::new_string(result, (start, end)))
     }
 
     fn parse_integer_expr(&mut self, n: i32) -> Result<ExprAST> {
-        let result = ExprAST::Integer(n);
+        let result = ExprAST::new_integer(n, self.current_token.idx);
         self.advance_token();
         Ok(result)
     }
@@ -414,7 +445,9 @@ impl Parser {
                 rhs = self.parse_binop_rhs(token_prec + 1, rhs)?;
             }
 
-            lhs = ExprAST::new_binary_expr(binop, Box::new(lhs), Box::new(rhs));
+            let start = lhs.context.0;
+            let end = rhs.context.1;
+            lhs = ExprAST::new_binary_expr(binop, Box::new(lhs), Box::new(rhs), (start, end));
         }
     }
 }
