@@ -31,6 +31,7 @@ impl Interpreter {
                         vec![("s".to_string(), ExprType::String)],
                         ExprType::Integer,
                         (0, 0),
+                        (0, 0),
                     );
                     let body = ExprAST::new_function_call(
                         "print".to_string(),
@@ -38,13 +39,17 @@ impl Interpreter {
                             "s".to_string(),
                             Some(ExprType::String),
                             (0, 0),
+                            (0, 0),
                         )],
                         Some(ExprType::Integer),
                         (0, 0),
+                        (0, 0),
                     )
                     .set_internal();
-                    self.functions
-                        .insert("print".to_string(), FunctionAST::new(proto, body, (0, 0)));
+                    self.functions.insert(
+                        "print".to_string(),
+                        FunctionAST::new(proto, body, (0, 0), (0, 0)),
+                    );
                 }
             }
         }

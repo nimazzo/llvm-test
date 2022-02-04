@@ -62,6 +62,7 @@ impl<'a> TypeChecker<'a> {
                     &old.name,
                     here!(),
                 )
+                .with_pos(fun.pos)
                 .into());
             };
         }
@@ -79,6 +80,7 @@ impl<'a> TypeChecker<'a> {
                         ),
                         here!(),
                     )
+                    .with_pos(fun.proto.pos)
                     .into());
                 }
                 let ret_type = fun.proto.ty;
@@ -89,6 +91,7 @@ impl<'a> TypeChecker<'a> {
                         &format!("Return Type must be 'int', found '{}'", ret_type.as_str()),
                         here!(),
                     )
+                    .with_pos(fun.proto.pos)
                     .into());
                 }
             }
@@ -140,11 +143,13 @@ impl<'a> TypeChecker<'a> {
                     .expect(INTERNAL_ERROR);
 
                 let context = optionize(unresolved_symbol.context);
+                println!("DEBUG: {:#?}", unresolved_symbol);
                 return Err(ParseError::unknown_type(
                     self.lexer.get_context(context),
                     "Cannot resolve type of symbol",
                     here!(),
                 )
+                .with_pos(unresolved_symbol.pos)
                 .into());
             }
             last_unresolved = unresolved;
@@ -173,6 +178,7 @@ impl<'a> TypeChecker<'a> {
                             body_type.as_str(),
                             here!(),
                         )
+                        .with_pos(fun.proto.pos)
                         .into());
                     }
                 }
@@ -190,6 +196,7 @@ impl<'a> TypeChecker<'a> {
                     "void type not allowed as function arguments",
                     here!(),
                 )
+                .with_pos(proto.pos)
                 .into());
             }
         }
@@ -208,6 +215,7 @@ impl<'a> TypeChecker<'a> {
                         args.len(),
                         here!(),
                     )
+                    .with_pos(expr.pos)
                     .into());
                 }
                 for (arg, (_, expected)) in args.iter().zip(proto.args.iter()) {
@@ -220,6 +228,7 @@ impl<'a> TypeChecker<'a> {
                             arg_type.as_str(),
                             here!(),
                         )
+                        .with_pos(expr.pos)
                         .into());
                     }
                 }
@@ -239,6 +248,7 @@ impl<'a> TypeChecker<'a> {
                             right_type.as_str(),
                             here!(),
                         )
+                        .with_pos(expr.pos)
                         .into())
                     }
                 }
@@ -274,6 +284,7 @@ impl<'a> TypeChecker<'a> {
                         "Could not resolve type (this is an internal compiler error)",
                         here!(),
                     )
+                    .with_pos(fun.body.pos)
                     .into());
                 }
             }

@@ -22,7 +22,7 @@ macro_rules! parse {
                 &format!("{}", $tk),
                 here!(),
             )
-            .with_pos($self.current_token.pos)),
+            .with_pos($self.lexer.get_token_pos())),
         }
     }};
 }
@@ -48,7 +48,7 @@ macro_rules! parse_identifier {
                 "Identifier",
                 here!(),
             )
-            .with_pos($self.current_token.pos)),
+            .with_pos($self.lexer.get_token_pos())),
         }
     }};
 }
@@ -133,19 +133,26 @@ impl<'a> Parser<'a> {
         self.console
             .println_verbose("[Parser] Trying to parse function");
         let (context_start, _) = self.lexer.get_token_idx();
+        let pos = self.lexer.get_token_pos();
         let proto = self.parse_function_prototype()?;
         let body = self.parse_function_body()?;
         let (_, context_end) = self.lexer.get_token_idx();
 
         self.console
             .println_verbose("[Parser] Successfully parsed function");
-        Ok(FunctionAST::new(proto, body, (context_start, context_end)))
+        Ok(FunctionAST::new(
+            proto,
+            body,
+            (context_start, context_end),
+            pos,
+        ))
     }
 
     fn parse_function_prototype(&mut self) -> Result<PrototypeAST> {
         self.console
             .println_verbose("[Parser] Trying to parse function prototype");
         let (context_start, _) = self.lexer.get_token_idx();
+        let pos = self.lexer.get_token_pos();
         parse!(self, TokenType::Fn)?;
         let function_name = parse_identifier!(self)?;
 
@@ -163,6 +170,7 @@ impl<'a> Parser<'a> {
             function_args,
             ret_type,
             (context_start, context_end),
+            pos,
         ))
     }
 
@@ -171,7 +179,7 @@ impl<'a> Parser<'a> {
         skip_whitespace_and_comments!(self);
         let idx = self.current_token.idx;
         let idx = (Some(idx.0), Some(idx.1));
-        let pos = self.current_token.pos;
+        let pos = self.lexer.get_token_pos();
         let type_ident = parse_identifier!(self)?;
 
         ExprType::from(type_ident.as_str()).map_err(|_| {
@@ -191,7 +199,7 @@ impl<'a> Parser<'a> {
                 skip_whitespace_and_comments!(self);
                 let idx = self.current_token.idx;
                 let idx = (Some(idx.0), Some(idx.1));
-                let pos = self.current_token.pos;
+                let pos = self.lexer.get_token_pos();
                 let type_ident = parse_identifier!(self)?;
                 function_args.push((
                     arg_name,
@@ -219,7 +227,7 @@ impl<'a> Parser<'a> {
         // Function has empty body
         if peek!(self) == TokenType::RightCurly {
             parse!(self, TokenType::RightCurly)?;
-            return Ok(ExprAST::new_nop((0, 0)));
+            return Ok(ExprAST::new_nop((0, 0), (0, 0)));
         }
 
         let mut expressions = vec![];
@@ -251,11 +259,13 @@ impl<'a> Parser<'a> {
                 let first = expressions.remove(0);
                 let second = self.parse_sequence(expressions)?;
                 let (context_start, context_end) = (first.context.0, second.context.1);
+                let pos = first.pos;
                 let context = (context_start, context_end);
                 Ok(ExprAST::new_sequence(
                     Box::new(first),
                     Box::new(second),
                     context,
+                    pos,
                 ))
             }
         }
@@ -267,6 +277,7 @@ impl<'a> Parser<'a> {
             .println_verbose("[Parser] Trying to parse top level expression");
 
         let (context_start, _) = self.lexer.get_token_idx();
+        let pos = self.lexer.get_token_pos();
         let mut expressions = vec![];
         loop {
             let body = self.parse_expression()?;
@@ -280,7 +291,7 @@ impl<'a> Parser<'a> {
             }
         }
         let (_, context_end) = self.lexer.get_token_idx();
-        expressions.push(ExprAST::new_nop((0, 0)));
+        expressions.push(ExprAST::new_nop((0, 0), (0, 0)));
 
         let body = self.parse_sequence(expressions)?;
 
@@ -289,10 +300,16 @@ impl<'a> Parser<'a> {
             vec![],
             ExprType::Void,
             (0, 0),
+            (0, 0),
         );
         self.console
             .println_verbose("[Parser] Successfully parsed top level expression");
-        Ok(FunctionAST::new(proto, body, (context_start, context_end)))
+        Ok(FunctionAST::new(
+            proto,
+            body,
+            (context_start, context_end),
+            pos,
+        ))
     }
 
     fn parse_expression(&mut self) -> Result<ExprAST> {
@@ -311,7 +328,7 @@ impl<'a> Parser<'a> {
                 self.lexer.get_context((None, None)),
                 here!(),
             )
-            .with_pos(self.current_token.pos)
+            .with_pos(self.lexer.get_token_pos())
             .into()),
             token => {
                 return Err(ParseError::no_primary_expression(
@@ -319,7 +336,7 @@ impl<'a> Parser<'a> {
                     format!("{}", token),
                     here!(),
                 )
-                .with_pos(self.current_token.pos)
+                .with_pos(self.lexer.get_token_pos())
                 .into());
             }
         }
@@ -327,6 +344,7 @@ impl<'a> Parser<'a> {
 
     fn parse_identifier(&mut self) -> Result<ExprAST> {
         let context_start = self.lexer.get_token_idx().0;
+        let pos = self.lexer.get_token_pos();
         let ident = parse_identifier!(self)?;
         if peek!(self) == TokenType::LeftParen {
             let call_args = self.parse_call_arguments()?;
@@ -336,6 +354,7 @@ impl<'a> Parser<'a> {
                 call_args,
                 None,
                 (context_start, context_end),
+                pos,
             ))
         } else {
             let context_end = self.lexer.get_token_idx().1;
@@ -343,6 +362,7 @@ impl<'a> Parser<'a> {
                 ident,
                 None,
                 (context_start, context_end),
+                pos,
             ))
         }
     }
@@ -368,8 +388,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_string(&mut self) -> Result<ExprAST> {
-        let pos = self.current_token.pos;
-        let start = self.current_token.idx.0;
+        let pos = self.lexer.get_token_pos();
+        let start = self.lexer.get_token_idx().0;
         let mut result = String::new();
         parse!(self, TokenType::DoubleQuotes)?;
 
@@ -390,11 +410,13 @@ impl<'a> Parser<'a> {
         }
         let end = parse!(self, TokenType::DoubleQuotes)?.idx.1;
 
-        Ok(ExprAST::new_string(result, (start, end)))
+        Ok(ExprAST::new_string(result, (start, end), pos))
     }
 
     fn parse_integer_expr(&mut self, n: i32) -> Result<ExprAST> {
-        let result = ExprAST::new_integer(n, self.current_token.idx);
+        let context = self.lexer.get_token_idx();
+        let pos = self.lexer.get_token_pos();
+        let result = ExprAST::new_integer(n, context, pos);
         self.advance_token();
         Ok(result)
     }
@@ -429,7 +451,7 @@ impl<'a> Parser<'a> {
                         "binary operator",
                         here!(),
                     )
-                    .with_pos(self.current_token.pos)
+                    .with_pos(self.lexer.get_token_pos())
                     .into())
                 }
             };
@@ -446,8 +468,9 @@ impl<'a> Parser<'a> {
             }
 
             let start = lhs.context.0;
+            let pos = lhs.pos;
             let end = rhs.context.1;
-            lhs = ExprAST::new_binary_expr(binop, Box::new(lhs), Box::new(rhs), (start, end));
+            lhs = ExprAST::new_binary_expr(binop, Box::new(lhs), Box::new(rhs), (start, end), pos);
         }
     }
 }

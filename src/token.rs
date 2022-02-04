@@ -2,15 +2,15 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Clone)]
 pub struct Token {
-    pub pos: (usize, usize),
+    // pub pos: (usize, usize),
     pub idx: (usize, usize),
     pub token_type: TokenType,
 }
 
 impl Token {
-    pub fn new(pos: (usize, usize), idx: (usize, usize), token_type: TokenType) -> Self {
+    pub fn new(/*pos: (usize, usize),*/ idx: (usize, usize), token_type: TokenType) -> Self {
         Self {
-            pos,
+            // pos,
             idx,
             token_type,
         }

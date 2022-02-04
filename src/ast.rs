@@ -38,6 +38,7 @@ pub struct PrototypeAST {
     pub args: Vec<(String, ExprType)>,
     pub ty: ExprType,
     pub context: (usize, usize),
+    pub pos: (usize, usize),
 }
 
 impl PrototypeAST {
@@ -46,12 +47,14 @@ impl PrototypeAST {
         args: Vec<(String, ExprType)>,
         ty: ExprType,
         context: (usize, usize),
+        pos: (usize, usize),
     ) -> Self {
         Self {
             name,
             args,
             ty,
             context,
+            pos,
         }
     }
 }
@@ -61,14 +64,21 @@ pub struct FunctionAST {
     pub proto: PrototypeAST,
     pub body: ExprAST,
     pub context: (usize, usize),
+    pub pos: (usize, usize),
 }
 
 impl FunctionAST {
-    pub fn new(proto: PrototypeAST, body: ExprAST, context: (usize, usize)) -> Self {
+    pub fn new(
+        proto: PrototypeAST,
+        body: ExprAST,
+        context: (usize, usize),
+        pos: (usize, usize),
+    ) -> Self {
         Self {
             proto,
             body,
             context,
+            pos,
         }
     }
 }
@@ -77,6 +87,7 @@ impl FunctionAST {
 pub struct ExprAST {
     pub variant: ExprVariant,
     pub context: (usize, usize),
+    pub pos: (usize, usize),
 }
 
 impl ExprVariant {
@@ -207,38 +218,49 @@ impl ExprAST {
         lhs: Box<ExprAST>,
         rhs: Box<ExprAST>,
         context: (usize, usize),
+        pos: (usize, usize),
     ) -> Self {
         Self {
             variant: ExprVariant::BinaryExpr { op, lhs, rhs },
             context,
+            pos,
         }
     }
 
-    pub fn new_string(s: String, context: (usize, usize)) -> Self {
+    pub fn new_string(s: String, context: (usize, usize), pos: (usize, usize)) -> Self {
         Self {
             variant: ExprVariant::String(s),
             context,
+            pos,
         }
     }
 
-    pub fn new_integer(n: i32, context: (usize, usize)) -> Self {
+    pub fn new_integer(n: i32, context: (usize, usize), pos: (usize, usize)) -> Self {
         Self {
             variant: ExprVariant::Integer(n),
             context,
+            pos,
         }
     }
 
-    pub fn new_nop(context: (usize, usize)) -> Self {
+    pub fn new_nop(context: (usize, usize), pos: (usize, usize)) -> Self {
         Self {
             variant: ExprVariant::Nop,
             context,
+            pos,
         }
     }
 
-    pub fn new_sequence(lhs: Box<ExprAST>, rhs: Box<ExprAST>, context: (usize, usize)) -> Self {
+    pub fn new_sequence(
+        lhs: Box<ExprAST>,
+        rhs: Box<ExprAST>,
+        context: (usize, usize),
+        pos: (usize, usize),
+    ) -> Self {
         Self {
             variant: ExprVariant::Sequence { lhs, rhs },
             context,
+            pos,
         }
     }
 
@@ -247,6 +269,7 @@ impl ExprAST {
         args: Vec<ExprAST>,
         ty: Option<ExprType>,
         context: (usize, usize),
+        pos: (usize, usize),
     ) -> Self {
         Self {
             variant: ExprVariant::FunctionCall {
@@ -256,6 +279,20 @@ impl ExprAST {
                 internal: false,
             },
             context,
+            pos,
+        }
+    }
+
+    pub fn new_variable(
+        ident: String,
+        ty: Option<ExprType>,
+        context: (usize, usize),
+        pos: (usize, usize),
+    ) -> Self {
+        Self {
+            variant: ExprVariant::Variable { ident, ty },
+            context,
+            pos,
         }
     }
 
@@ -267,13 +304,6 @@ impl ExprAST {
             *internal = true;
         }
         self
-    }
-
-    pub fn new_variable(ident: String, ty: Option<ExprType>, context: (usize, usize)) -> Self {
-        Self {
-            variant: ExprVariant::Variable { ident, ty },
-            context,
-        }
     }
 }
 

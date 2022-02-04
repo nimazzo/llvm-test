@@ -36,6 +36,7 @@ fn get_print_string_definition() -> PrototypeAST {
         vec![("s".to_string(), ExprType::String)],
         ExprType::Integer,
         (0, 0),
+        (0, 0),
     )
 }
 
@@ -83,7 +84,13 @@ fn compile_print_string<'ctx>(compiler: &'ctx mut Compiler) -> Result<FunctionVa
     let public_name = "print".to_string();
 
     let args = vec![("s".to_string(), ExprType::String)];
-    let proto = PrototypeAST::new(internal_name.clone(), args, ExprType::Integer, (0, 0));
+    let proto = PrototypeAST::new(
+        internal_name.clone(),
+        args,
+        ExprType::Integer,
+        (0, 0),
+        (0, 0),
+    );
 
     let function = {
         let args_types = vec![BasicMetadataTypeEnum::from(
@@ -100,10 +107,11 @@ fn compile_print_string<'ctx>(compiler: &'ctx mut Compiler) -> Result<FunctionVa
     let body = ExprAST::new_function_call(
         "printf".to_string(),
         vec![
-            ExprAST::new_string("%s\n".to_string(), (0, 0)),
-            ExprAST::new_variable("s".to_string(), Some(ExprType::String), (0, 0)),
+            ExprAST::new_string("%s\n".to_string(), (0, 0), (0, 0)),
+            ExprAST::new_variable("s".to_string(), Some(ExprType::String), (0, 0), (0, 0)),
         ],
         Some(ExprType::Integer),
+        (0, 0),
         (0, 0),
     )
     .set_internal();
