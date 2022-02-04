@@ -16,6 +16,7 @@ pub enum ExternalFuncton {
     Printf,
 }
 
+// Internal Prototype Definitions
 pub fn get_internal_definitions() -> Vec<PrototypeAST> {
     let mut ast = vec![];
     let functions = [PrintString]; // !!!Add new Values here!!!
@@ -24,7 +25,6 @@ pub fn get_internal_definitions() -> Vec<PrototypeAST> {
             PrintString => { ast.push(get_print_string_definition()); }
         }
     }
-
     ast
 }
 
@@ -32,6 +32,7 @@ fn get_print_string_definition() -> PrototypeAST {
     PrototypeAST::new("print".to_string(), vec![("s".to_string(), ExprType::String)], ExprType::Integer)
 }
 
+// Define external Functions
 pub fn define_external_functions(compiler: &mut Compiler) -> Result<()> {
     let functions = [Printf]; // !!!Add new Values here!!!
     for function in functions {
@@ -50,7 +51,8 @@ fn define_printf(compiler: &Compiler) -> Result<()> {
     Ok(())
 }
 
-pub fn compile_core_functions(compiler: &mut Compiler) -> Result<()> {
+// Compile Internal Functions
+pub fn compile_internal_functions(compiler: &mut Compiler) -> Result<()> {
     let functions = [PrintString]; // !!!Add new Values here!!!
     for function in functions {
         match function {
@@ -78,11 +80,6 @@ fn compile_print_string<'ctx>(compiler: &'ctx mut Compiler) -> Result<FunctionVa
     compiler.alloc_fn_arguments(function, &proto)?;
 
     // compile function body
-    /* fn print_internal(s: String) -> int {
-     *     let fmt = "%s\n";
-     *     printf(fmt, s);
-     * }
-     */
     let body = ExprAST::FunctionCall {
         fn_name: "printf".to_string(),
         args: vec![ExprAST::String("%s\n".to_string()), ExprAST::Variable {
@@ -93,7 +90,6 @@ fn compile_print_string<'ctx>(compiler: &'ctx mut Compiler) -> Result<FunctionVa
         internal: true,
     };
 
-    // todo: try reduce amount of duplicate code
     let compiled_body = compiler.compile_expr(&body)?;
     compiler.builder.build_return(Some(&compiled_body));
 
@@ -111,4 +107,3 @@ fn compile_print_string<'ctx>(compiler: &'ctx mut Compiler) -> Result<FunctionVa
         Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
     }
 }
-

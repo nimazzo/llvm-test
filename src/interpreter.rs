@@ -4,12 +4,9 @@ use crate::Console;
 use crate::core::InternalFunction;
 use crate::interpreter::ExprResult::Number;
 
-// todo: lots of cloning going on here
-
 pub struct Interpreter {
     functions: HashMap<String, FunctionAST>,
     main_function: Option<FunctionAST>,
-    variables: HashMap<String, ExprAST>,
 }
 
 const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
@@ -19,7 +16,6 @@ impl Interpreter {
         Self {
             functions: HashMap::new(),
             main_function: None,
-            variables: HashMap::new(),
         }
     }
 
@@ -36,7 +32,7 @@ impl Interpreter {
         }
     }
 
-    pub fn run(&mut self, ast: &AST, console: Console) {
+    pub fn run(&mut self, ast: AST, console: Console) {
         self.define_internal_functions();
 
         for node in ast {
@@ -46,28 +42,24 @@ impl Interpreter {
                 }
                 ASTPrimitive::Function(fun) => {
                     if fun.proto.name == "main" {
-                        self.main_function = Some(fun.clone());
+                        self.main_function = Some(fun);
                     } else {
-                        self.functions.insert(fun.proto.name.clone(), fun.clone());
+                        self.functions.insert(fun.proto.name.clone(), fun);
                     }
                 }
             }
         }
-        if let Some(main) = &self.main_function.clone() {
-            let result = self.eval_fn(main);
+        if let Some(main) = self.main_function.take() {
+            let result = self.eval_expr(&main.body, &HashMap::new());
             console.force_println(format!("[Interpreter] Main function exited with: {:?}", result));
         } else {
             console.force_println("[Interpreter] Warning: Program does not contain main function.");
         }
     }
 
-    fn eval_fn(&mut self, fun: &FunctionAST) -> ExprResult {
-        self.eval_expr(&fun.body)
-    }
-
-    fn eval_print(&mut self, args: &[ExprAST]) -> ExprResult {
+    fn eval_print(&self, args: &[ExprAST], local_variables: &HashMap<String, ExprAST>) -> ExprResult {
         let s = args.get(0).expect(INTERNAL_ERROR);
-        let result = self.eval_expr(s);
+        let result = self.eval_expr(s, local_variables);
         if let ExprResult::String(s) = result {
             println!("[Interpreter] {}", s);
             return ExprResult::Number(s.len() as i32);
@@ -75,55 +67,56 @@ impl Interpreter {
         panic!("{}", INTERNAL_ERROR);
     }
 
-    fn eval_function_call(&mut self, fn_name: &str, args: &[ExprAST], internal: bool) -> ExprResult {
+    fn eval_function_call(&self, fn_name: &str, args: &[ExprAST], internal: bool, local_variables: &HashMap<String, ExprAST>) -> ExprResult {
         if internal {
             match fn_name {
-                "print" => self.eval_print(args),
+                "print" => self.eval_print(args, local_variables),
                 _ => panic!("unknown internal function"),
             }
         } else {
-            let fun = self.functions.get(fn_name).unwrap().clone();
+            let fun = self.functions.get(fn_name).expect(INTERNAL_ERROR);
 
+            let mut local_variables = HashMap::new();
             for (name, arg) in fun.proto.args.iter().map(|(a, _)| a).zip(args.iter()) {
-                self.variables.insert(name.to_string(), arg.clone());
+                local_variables.insert(name.to_string(), arg.clone());
             }
 
-            let result = self.eval_expr(&fun.body);
-            self.variables.clear();
+            let result = self.eval_expr(&fun.body, &local_variables);
+            local_variables.clear();
             result
         }
     }
 
-    fn eval_expr(&mut self, expr: &ExprAST) -> ExprResult {
+    fn eval_expr(&self, expr: &ExprAST, local_variables: &HashMap<String, ExprAST>) -> ExprResult {
         match expr {
             ExprAST::Integer(value) => { ExprResult::Number(*value) }
             ExprAST::String(s) => { ExprResult::String(s.clone()) }
             ExprAST::Variable { ident, .. } => {
-                let expr = self.variables.get(ident).expect(INTERNAL_ERROR).clone();
-                self.eval_expr(&expr)
+                let expr = local_variables.get(ident).expect(INTERNAL_ERROR);
+                self.eval_expr(expr, local_variables)
             }
             ExprAST::FunctionCall { fn_name, args, internal, .. } => {
-                self.eval_function_call(fn_name, args, *internal)
+                self.eval_function_call(fn_name, args, *internal, local_variables)
             }
             ExprAST::BinaryExpr { op, lhs, rhs } => {
                 match op {
-                    BinOp::Add => self.eval_add(lhs, rhs),
-                    BinOp::Minus => self.eval_minus(lhs, rhs),
-                    BinOp::Mul => self.eval_mul(lhs, rhs),
-                    BinOp::Div => self.eval_div(lhs, rhs),
+                    BinOp::Add => self.eval_add(lhs, rhs, local_variables),
+                    BinOp::Minus => self.eval_minus(lhs, rhs, local_variables),
+                    BinOp::Mul => self.eval_mul(lhs, rhs, local_variables),
+                    BinOp::Div => self.eval_div(lhs, rhs, local_variables),
                 }
             }
             ExprAST::Sequence { lhs, rhs } => {
-                self.eval_expr(lhs);
-                self.eval_expr(rhs)
+                self.eval_expr(lhs, local_variables);
+                self.eval_expr(rhs, local_variables)
             }
             ExprAST::Nop => { ExprResult::Null }
         }
     }
 
-    fn eval_add(&mut self, lhs: &ExprAST, rhs: &ExprAST) -> ExprResult {
-        let lhs_eval = self.eval_expr(lhs);
-        let rhs_eval = self.eval_expr(rhs);
+    fn eval_add(&self, lhs: &ExprAST, rhs: &ExprAST, local_variables: &HashMap<String, ExprAST>) -> ExprResult {
+        let lhs_eval = self.eval_expr(lhs, local_variables);
+        let rhs_eval = self.eval_expr(rhs, local_variables);
 
         match (&lhs_eval, &rhs_eval) {
             (Number(a), Number(b)) => {
@@ -136,9 +129,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_minus(&mut self, lhs: &ExprAST, rhs: &ExprAST) -> ExprResult {
-        let lhs_eval = self.eval_expr(lhs);
-        let rhs_eval = self.eval_expr(rhs);
+    fn eval_minus(&self, lhs: &ExprAST, rhs: &ExprAST, local_variables: &HashMap<String, ExprAST>) -> ExprResult {
+        let lhs_eval = self.eval_expr(lhs, local_variables);
+        let rhs_eval = self.eval_expr(rhs, local_variables);
 
         match (&lhs_eval, &rhs_eval) {
             (Number(a), Number(b)) => {
@@ -151,9 +144,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_mul(&mut self, lhs: &ExprAST, rhs: &ExprAST) -> ExprResult {
-        let lhs_eval = self.eval_expr(lhs);
-        let rhs_eval = self.eval_expr(rhs);
+    fn eval_mul(&self, lhs: &ExprAST, rhs: &ExprAST, local_variables: &HashMap<String, ExprAST>) -> ExprResult {
+        let lhs_eval = self.eval_expr(lhs, local_variables);
+        let rhs_eval = self.eval_expr(rhs, local_variables);
 
         match (&lhs_eval, &rhs_eval) {
             (Number(a), Number(b)) => {
@@ -166,9 +159,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_div(&mut self, lhs: &ExprAST, rhs: &ExprAST) -> ExprResult {
-        let lhs_eval = self.eval_expr(lhs);
-        let rhs_eval = self.eval_expr(rhs);
+    fn eval_div(&self, lhs: &ExprAST, rhs: &ExprAST, local_variables: &HashMap<String, ExprAST>) -> ExprResult {
+        let lhs_eval = self.eval_expr(lhs, local_variables);
+        let rhs_eval = self.eval_expr(rhs, local_variables);
 
         match (&lhs_eval, &rhs_eval) {
             (Number(a), Number(b)) => {

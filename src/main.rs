@@ -204,7 +204,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     if cli.interpret {
         start_timer!(timer, "Interpreter", cli.time);
         let mut interpreter = Interpreter::new();
-        interpreter.run(&ast, console);
+        interpreter.run(ast, console);
         stop_timer!(timer, cli.time);
         display_timer!(timer, cli.time);
         return Ok(());

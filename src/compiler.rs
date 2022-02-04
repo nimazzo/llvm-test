@@ -53,7 +53,7 @@ impl<'ctx> Compiler<'ctx> {
 
         // self.debug_declare_print();
         crate::core::define_external_functions(self)?;
-        crate::core::compile_core_functions(self)?;
+        crate::core::compile_internal_functions(self)?;
 
         for node in ast {
             let (fun, params, ty) = match node {
