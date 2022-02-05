@@ -1,20 +1,14 @@
 // fn main()
 
-fn printf() -> void {
-}
-
-fn printf(i: int) -> int {
-    print(i);
-}
-
 fn a(a: int) -> int {
+    print("a() called");
     b(a);
 }
 
-fn b(c: int) -> int {
-    c;
+fn b(a: int) -> int {
+    print("b() called");
+    c(a);
 }
-
 
 fn main() -> int {
     a(10);

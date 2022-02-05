@@ -2,6 +2,7 @@
 // todo: implement escape char in strings (mainly \n)
 // todo: implement print function for integers
 // todo: improve compile errors (add context)
+// todo: try to compile all function prototypes first so that they can be called before definition
 
 extern crate inkwell;
 
@@ -202,8 +203,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     // Option -i, --interpret
     if cli.interpret {
         start_timer!(timer, "Interpreter", cli.time);
-        let mut interpreter = Interpreter::new();
-        interpreter.run(ast, console);
+        let mut interpreter = Interpreter::new(console);
+        interpreter.run(ast);
         stop_timer!(timer, cli.time);
         display_timer!(timer, cli.time);
         return Ok(());

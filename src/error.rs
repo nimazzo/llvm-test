@@ -53,8 +53,6 @@ pub enum CompileErrorType {
     UnknownFunction(String),
     #[error("Runtime Error: {0}")]
     RuntimeError(String),
-    #[error("This is not an error, just an internal marker")]
-    VoidReturn,
 }
 
 impl CompileError {
@@ -89,13 +87,6 @@ impl CompileError {
     pub fn runtime_error(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::RuntimeError(msg.to_string()),
-            location,
-        }
-    }
-
-    pub fn void_return(location: String) -> Self {
-        Self {
-            error_type: CompileErrorType::VoidReturn,
             location,
         }
     }

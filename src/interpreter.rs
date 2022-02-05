@@ -11,15 +11,17 @@ use std::collections::HashMap;
 pub struct Interpreter {
     functions: HashMap<String, Vec<FunctionAST>>,
     main_function: Option<FunctionAST>,
+    console: Console,
 }
 
 const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
 
 impl Interpreter {
-    pub fn new() -> Self {
+    pub fn new(console: Console) -> Self {
         Self {
             functions: HashMap::new(),
             main_function: None,
+            console,
         }
     }
 
@@ -86,7 +88,7 @@ impl Interpreter {
         }
     }
 
-    pub fn run(&mut self, ast: AST, console: Console) {
+    pub fn run(&mut self, ast: AST) {
         self.define_internal_functions();
 
         for node in ast {
@@ -108,12 +110,13 @@ impl Interpreter {
         }
         if let Some(main) = self.main_function.take() {
             let result = self.eval_expr(&main.body, &HashMap::new());
-            console.force_println(format!(
+            self.console.force_println(format!(
                 "[Interpreter] Main function exited with: {:?}",
                 result
             ));
         } else {
-            console.force_println("[Interpreter] Warning: Program does not contain main function.");
+            self.console
+                .force_println("[Interpreter] Warning: Program does not contain main function.");
         }
     }
 
@@ -126,11 +129,11 @@ impl Interpreter {
         let result = self.eval_expr(s, local_variables);
         match result {
             ExprResult::Number(n) => {
-                println!("[Interpreter] {}", n);
+                self.console.force_println(format!("[Interpreter] {}", n));
                 ExprResult::Number(n.to_string().len() as i32)
             }
             ExprResult::String(s) => {
-                println!("[Interpreter] {}", s);
+                self.console.force_println(format!("[Interpreter] {}", s));
                 ExprResult::Number(s.len() as i32)
             }
             _ => {
@@ -162,17 +165,18 @@ impl Interpreter {
                 .expect(INTERNAL_ERROR);
 
             let mut local_variables = HashMap::new();
-            for (key, val) in old_local_variables {
-                local_variables.insert(key.clone(), val.clone());
-            }
             for (name, arg) in fun.proto.args.iter().map(|(a, _)| a).zip(args.iter()) {
-                local_variables.insert(name.to_string(), arg.clone());
+                let arg = if let ExprVariant::Variable { ident, .. } = &arg.variant {
+                    old_local_variables
+                        .get(ident)
+                        .expect(INTERNAL_ERROR)
+                        .clone()
+                } else {
+                    arg.clone()
+                };
+                local_variables.insert(name.to_string(), arg);
             }
 
-            println!(
-                "Function call: {}. With local variables: {:#?}",
-                fn_name, local_variables
-            );
             let result = self.eval_expr(&fun.body, &local_variables);
             local_variables.clear();
             result
