@@ -1,5 +1,4 @@
-use crate::Compiler;
-use inkwell::types::AnyTypeEnum;
+use crate::util::{resolve_function, INTERNAL_ERROR};
 use inkwell::AddressSpace;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
@@ -149,10 +148,17 @@ impl ExprVariant {
                 match ty {
                     Some(t) => Some(t.clone()),
                     None => {
-                        match context.functions.get(fn_name).map(|proto| {
-                            *ty = Some(proto.ty.clone());
-                            &proto.ty
-                        }) {
+                        let arg_types = args
+                            .iter()
+                            .cloned()
+                            .map(|expr| expr.variant.type_of().expect(INTERNAL_ERROR))
+                            .collect::<Vec<_>>();
+                        match resolve_function(&context.functions, fn_name, &arg_types).map(
+                            |proto| {
+                                *ty = Some(proto.ty.clone());
+                                &proto.ty
+                            },
+                        ) {
                             Some(t) => Some(t.clone()),
                             None => {
                                 *unresolved += 1;
@@ -363,7 +369,7 @@ impl ExprType {
 }
 
 pub struct TypeContext {
-    pub functions: HashMap<String, PrototypeAST>,
+    pub functions: HashMap<String, Vec<PrototypeAST>>,
     pub variables: HashMap<String, ExprType>,
 }
 
@@ -380,7 +386,7 @@ impl TypeContext {
         self.variables.extend(vars.into_iter());
     }
 
-    pub fn add_functions(&mut self, funs: HashMap<String, PrototypeAST>) {
+    pub fn add_functions(&mut self, funs: HashMap<String, Vec<PrototypeAST>>) {
         self.functions.extend(funs.into_iter());
     }
 }

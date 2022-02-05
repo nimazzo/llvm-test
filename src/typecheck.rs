@@ -3,7 +3,7 @@ use crate::ast::{
     AST,
 };
 use crate::error::ParseError;
-use crate::util::optionize;
+use crate::util::{optionize, resolve_function};
 use crate::{here, Console, Lexer};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -39,8 +39,12 @@ impl<'a> TypeChecker<'a> {
         let mut functions = HashMap::new();
         internal_defs.iter().for_each(|proto| {
             let name = proto.name.clone();
-            functions.insert(name, proto.clone());
+            functions
+                .entry(name)
+                .or_insert_with(Vec::new)
+                .push(proto.clone());
         });
+        println!("47: {:#?}", functions);
 
         // store all known function types
         let function_definitions = ast.iter().filter_map(|node| {
@@ -56,16 +60,30 @@ impl<'a> TypeChecker<'a> {
             if fun.proto.name == "main" {
                 main_function = Some(fun);
             }
-            if let Some(old) = functions.insert(fun.proto.name.clone(), fun.proto.clone()) {
+
+            let arg_types = fun
+                .proto
+                .args
+                .iter()
+                .cloned()
+                .map(|(_, t)| t)
+                .collect::<Vec<_>>();
+            if resolve_function(&functions, &fun.proto.name, &arg_types).is_some() {
                 let context = optionize(fun.context);
                 return Err(ParseError::duplicate_function_definition(
                     self.lexer.get_context(context),
-                    &old.name,
+                    &fun.proto.name,
                     here!(),
                 )
                 .with_pos(fun.pos)
                 .into());
-            };
+            }
+
+            functions
+                .entry(fun.proto.name.clone())
+                .or_insert_with(Vec::new)
+                .push(fun.proto.clone());
+            println!("87: {:#?}", functions);
         }
 
         match main_function {
@@ -115,8 +133,12 @@ impl<'a> TypeChecker<'a> {
             .collect::<Vec<_>>();
 
         self.console.println(format!(
-            "[Type Checker] Found {} Function Definitions",
-            self.context.functions.len()
+            "[Type Checker] Found {} Function Definitions: \n{:#?}",
+            self.context
+                .functions
+                .iter()
+                .fold(0, |acc, (_, funs)| acc + funs.len()),
+            self.context.functions
         ));
         let mut last_unresolved = 0;
         let mut round = 1;
@@ -142,6 +164,47 @@ impl<'a> TypeChecker<'a> {
                     .filter_map(get_unresolved_symbol)
                     .next()
                     .expect(INTERNAL_ERROR);
+
+                if let ExprVariant::FunctionCall { fn_name, args, .. } = &unresolved_symbol.variant
+                {
+                    if let Some(functions) = self.context.functions.get(fn_name) {
+                        let context = optionize(unresolved_symbol.context);
+
+                        let found = args
+                            .iter()
+                            .map(|expr| format!("{:?}", expr.variant.type_of()))
+                            .collect::<Vec<String>>()
+                            .join(", ");
+                        let found = format!("[{}]", found);
+
+                        let expected = functions
+                            .iter()
+                            .map(|fun| {
+                                fun.args
+                                    .iter()
+                                    .map(|(_, t)| t.clone())
+                                    .collect::<Vec<ExprType>>()
+                            })
+                            .map(|t| {
+                                t.iter()
+                                    .map(|t| format!("{:?}", t))
+                                    .collect::<Vec<String>>()
+                                    .join(", ")
+                            })
+                            .map(|lines| format!("[{}]", lines))
+                            .collect::<Vec<String>>()
+                            .join(", ");
+
+                        return Err(ParseError::wrong_arguments(
+                            self.lexer.get_context(context),
+                            &found,
+                            &expected,
+                            here!(),
+                        )
+                        .with_pos(unresolved_symbol.pos)
+                        .into());
+                    }
+                }
 
                 let context = optionize(unresolved_symbol.context);
                 return Err(ParseError::unknown_type(
@@ -206,31 +269,22 @@ impl<'a> TypeChecker<'a> {
     fn check_expr_types(&self, expr: &ExprAST) -> Result<()> {
         match &expr.variant {
             ExprVariant::FunctionCall { fn_name, args, .. } => {
-                let proto = self.context.functions.get(fn_name).expect(INTERNAL_ERROR);
-                if args.len() != proto.args.len() {
+                let arg_types = args
+                    .iter()
+                    .cloned()
+                    .map(|expr| expr.variant.type_of().expect(INTERNAL_ERROR))
+                    .collect::<Vec<_>>();
+                let proto = resolve_function(&self.context.functions, fn_name, &arg_types);
+                if proto.is_none() {
                     let context = optionize(expr.context);
-                    return Err(ParseError::wrong_argument_count(
+                    return Err(ParseError::wrong_arguments(
                         self.lexer.get_context(context),
-                        proto.args.len(),
-                        args.len(),
+                        "todo",
+                        "todo",
                         here!(),
                     )
                     .with_pos(expr.pos)
                     .into());
-                }
-                for (arg, (_, expected)) in args.iter().zip(proto.args.iter()) {
-                    let arg_type = arg.variant.type_of().expect(INTERNAL_ERROR);
-                    if arg_type != *expected {
-                        let context = optionize(expr.context);
-                        return Err(ParseError::unexpected_type(
-                            self.lexer.get_context(context),
-                            &expected.as_str(),
-                            &arg_type.as_str(),
-                            here!(),
-                        )
-                        .with_pos(expr.pos)
-                        .into());
-                    }
                 }
                 Ok(())
             }

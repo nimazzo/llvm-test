@@ -23,7 +23,7 @@ pub fn get_internal_definitions() -> Vec<PrototypeAST> {
     for function in functions {
         match function {
             PrintString => {
-                // ast.push(get_print_string_definition());
+                ast.push(get_print_string_definition());
             }
             PrintInteger => {
                 ast.push(get_print_integer_definition());
@@ -84,7 +84,7 @@ pub fn compile_internal_functions(compiler: &mut Compiler) -> Result<()> {
     for function in functions {
         match function {
             PrintString => {
-                // compile_print_string(compiler)?;
+                compile_print_string(compiler)?;
             }
             PrintInteger => {
                 compile_print_integer(compiler)?;

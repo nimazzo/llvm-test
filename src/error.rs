@@ -19,8 +19,8 @@ pub enum ParseErrorType {
     NoPrimaryExpression(String),
     #[error("Incompatible types: Expected: '{0}' Found: '{1}'")]
     UnexpectedType(String, String),
-    #[error("Wrong Function Argument Count: Expected: '{0}' Found: '{1}'")]
-    WrongArgumentCount(usize, usize),
+    #[error("Wrong Function Argument Count: Found: '{0}' Expected one of: '{1}'")]
+    WrongArguments(String, String),
     #[error("Unknown type: '{0}'")]
     UnknownType(String),
     #[error("Illegal Type: '{0}'")]
@@ -192,15 +192,10 @@ impl ParseError {
         }
     }
 
-    pub fn wrong_argument_count(
-        context: String,
-        expected: usize,
-        found: usize,
-        location: String,
-    ) -> Self {
+    pub fn wrong_arguments(context: String, found: &str, expected: &str, location: String) -> Self {
         Self {
             context,
-            error_type: ParseErrorType::WrongArgumentCount(expected, found),
+            error_type: ParseErrorType::WrongArguments(found.to_string(), expected.to_string()),
             location,
             row: None,
             col: None,

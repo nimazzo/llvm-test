@@ -12,11 +12,10 @@ use std::error::Error;
 use crate::error::CompileError;
 use crate::here;
 use crate::program::{CompiledFunction, CompiledProgram, ProgramBuilder};
+use crate::util::{resolve_function, INTERNAL_ERROR};
 use anyhow::Result;
 use inkwell::types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 use inkwell::{AddressSpace, OptimizationLevel};
-
-const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
 
 #[allow(dead_code)]
 pub struct Compiler<'ctx> {
@@ -26,7 +25,7 @@ pub struct Compiler<'ctx> {
     execution_engine: ExecutionEngine<'ctx>,
 
     pub variables: HashMap<String, PointerValue<'ctx>>,
-    pub functions: HashMap<String, PrototypeAST>,
+    pub functions: HashMap<String, Vec<PrototypeAST>>,
     pub curr_fn: Option<FunctionValue<'ctx>>,
 }
 
@@ -84,6 +83,7 @@ impl<'ctx> Compiler<'ctx> {
     pub fn compile_fn_prototype(&mut self, proto: &PrototypeAST) -> Result<FunctionValue<'ctx>> {
         let name = &proto.name;
         let args = &proto.args;
+        let mut proto = proto.clone();
 
         let args_types = args
             .iter()
@@ -112,13 +112,19 @@ impl<'ctx> Compiler<'ctx> {
         };
 
         let fn_val = self.module.add_function(name, fn_type, None);
+        proto.name =
+            unsafe { std::str::from_utf8_unchecked(fn_val.get_name().to_bytes()).to_string() };
 
         for (i, arg) in fn_val.get_param_iter().enumerate() {
             arg.set_name(&args[i].0)
         }
 
         // add function prototype to map of defined functions
-        self.functions.insert(name.clone(), proto.clone());
+        self.functions
+            .entry(name.clone())
+            .or_insert_with(Vec::new)
+            .push(proto);
+        // self.functions.insert(name.clone(), proto.clone());
         Ok(fn_val)
     }
 
@@ -215,7 +221,7 @@ impl<'ctx> Compiler<'ctx> {
     pub fn compile_fn(
         &mut self,
         public_name: &str,
-        proto: PrototypeAST,
+        mut proto: PrototypeAST,
         linkage: Option<Linkage>,
         is_var_args: bool,
         body: ExprAST,
@@ -232,56 +238,63 @@ impl<'ctx> Compiler<'ctx> {
                 }
             }
 
-            let ret_type = {
-                if let Ok(bt) = BasicTypeEnum::try_from(self.to_llvm_type(&proto.ty)) {
-                    bt
-                } else {
-                    return Err(
-                        CompileError::generic_compilation_error("Invalid Type", here!()).into(),
-                    );
-                }
+            let fn_type = if proto.ty == ExprType::Void {
+                self.context.void_type().fn_type(&args_types, is_var_args)
+            } else if let Ok(bt) = BasicTypeEnum::try_from(self.to_llvm_type(&proto.ty)) {
+                bt.fn_type(&args_types, is_var_args)
+            } else {
+                return Err(
+                    CompileError::generic_compilation_error("Invalid Type", here!()).into(),
+                );
             };
-
-            let fn_type = ret_type.fn_type(&args_types, is_var_args);
 
             self.module.add_function(&proto.name, fn_type, linkage)
         };
 
+        // update internal fn name
+        proto.name =
+            unsafe { std::str::from_utf8_unchecked(function.get_name().to_bytes()).to_string() };
+
         // Compile function body
         self.alloc_fn_arguments(function, &proto)?;
 
-        let compiled_body = self.compile_expr(&body)?;
-        self.builder.build_return(Some(&compiled_body));
+        match self.compile_expr(&body) {
+            Some(bev) => self.builder.build_return(Some(&bev)),
+            None => self.builder.build_return(None),
+        };
 
         // reset fn specific fields to default
         self.curr_fn = None;
         self.variables.clear();
 
         if function.verify(true) {
-            self.functions.insert(public_name.to_string(), proto);
+            // self.functions.insert(public_name.to_string(), proto);
+            self.functions
+                .entry(public_name.to_string())
+                .or_insert_with(Vec::new)
+                .push(proto);
             Ok(function)
         } else {
             unsafe {
                 function.delete();
             }
+            println!("DEBUG: {:?}", proto);
             Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
         }
     }
 
-    pub fn compile_expr(&self, expr: &ExprAST) -> Result<BasicValueEnum<'ctx>> {
+    pub fn compile_expr(&self, expr: &ExprAST) -> Option<BasicValueEnum<'ctx>> {
         let value = match &expr.variant {
             ExprVariant::Integer(value) => self
                 .context
                 .i32_type()
                 .const_int(*value as u64, true)
                 .into(),
-            ExprVariant::String(s) => self.compile_string(s)?,
-            ExprVariant::Variable { ident, .. } => match self.variables.get(ident) {
-                Some(ptr) => self.builder.build_load(*ptr, ident),
-                None => {
-                    return Err(CompileError::unknown_variable(ident, here!()).into());
-                }
-            },
+            ExprVariant::String(s) => self.compile_string(s),
+            ExprVariant::Variable { ident, .. } => {
+                let ptr = self.variables.get(ident).expect(INTERNAL_ERROR);
+                self.builder.build_load(*ptr, ident)
+            }
             ExprVariant::FunctionCall {
                 fn_name,
                 args,
@@ -295,19 +308,20 @@ impl<'ctx> Compiler<'ctx> {
                             .expect("[CRITICAL ERROR] Internal Compiler Error"),
                     )
                 } else {
-                    match self.functions.get(fn_name) {
-                        Some(proto) => (&proto.name, &proto.ty),
-                        None => {
-                            return Err(CompileError::unknown_function(fn_name, here!()).into());
-                        }
-                    }
+                    let arg_types = args
+                        .iter()
+                        .map(|expr| expr.variant.type_of().expect(INTERNAL_ERROR))
+                        .collect::<Vec<_>>();
+                    let proto = resolve_function(&self.functions, fn_name, &arg_types)
+                        .expect(INTERNAL_ERROR);
+                    (&proto.name, &proto.ty)
                 };
                 let fun = self
                     .module
                     .get_function(internal_fn_name)
                     .expect("[CRITICAL ERROR] Internal Compiler Error");
 
-                let argsv = self.compile_call_args(args)?;
+                let argsv = self.compile_call_args(args);
 
                 // Build function call
                 let call = self.builder.build_call(fun, &argsv, "tmp");
@@ -321,7 +335,7 @@ impl<'ctx> Compiler<'ctx> {
                         .left()
                         .expect("[CRITICAL ERROR] Internal Compiler Error"),
                     ExprType::Void => {
-                        return Err(CompileError::void_return(here!()).into());
+                        return None;
                     }
                     _ => todo!(""),
                 }
@@ -341,10 +355,10 @@ impl<'ctx> Compiler<'ctx> {
                 self.compile_expr(rhs)?
             }
             ExprVariant::Nop => {
-                return Err(CompileError::void_return(here!()).into());
+                return None;
             }
         };
-        Ok(value)
+        Some(value)
     }
 
     fn compile_add(
@@ -399,27 +413,27 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn compile_call_args(&self, args: &[ExprAST]) -> Result<Vec<BasicMetadataValueEnum<'ctx>>> {
+    fn compile_call_args(&self, args: &[ExprAST]) -> Vec<BasicMetadataValueEnum<'ctx>> {
         let mut compiled_args = Vec::with_capacity(args.len());
         for arg in args {
-            compiled_args.push(self.compile_expr(arg)?);
+            compiled_args.push(self.compile_expr(arg).expect(INTERNAL_ERROR));
         }
         let argsv: Vec<BasicMetadataValueEnum> = compiled_args
             .iter()
             .by_ref()
             .map(|&val| val.into())
             .collect();
-        Ok(argsv)
+        argsv
     }
 
-    fn compile_string(&self, string: &str) -> Result<BasicValueEnum<'ctx>> {
+    fn compile_string(&self, string: &str) -> BasicValueEnum<'ctx> {
         let string = self.context.const_string(string.as_bytes(), true);
         let ptr = self.builder.build_alloca(string.get_type(), "alloc_string");
         self.builder.build_store(ptr, string);
 
         let zero = self.context.i8_type().const_zero();
         let pp = unsafe { self.builder.build_gep(ptr, &[zero, zero], "gep") };
-        Ok(BasicValueEnum::from(pp))
+        BasicValueEnum::from(pp)
     }
 
     fn to_llvm_type(&self, ty: &ExprType) -> AnyTypeEnum<'ctx> {

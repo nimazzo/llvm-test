@@ -1,6 +1,16 @@
 // fn main()
 
+fn printf() -> void {
+}
+
+fn printf(i: int) -> int {
+    print("Hello from printf(i: int): ");
+    print(i);
+}
+
 fn main() -> int {
-    print(55 + 1203);
+    print("Hello");
+    print(999);
+    printf(69);
     42;
 }
