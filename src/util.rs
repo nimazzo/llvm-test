@@ -1,4 +1,4 @@
-use crate::ast::{ExprType, PrototypeAST};
+use crate::ast::{ExprType, FunctionAST, PrototypeAST};
 use std::collections::HashMap;
 
 pub const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
@@ -12,10 +12,6 @@ pub fn resolve_function<'a>(
     name: &str,
     args: &[ExprType],
 ) -> Option<&'a PrototypeAST> {
-    println!(
-        "[DEBUG] Trying to resolve function:\n[DEBUG] '{}' called with args: {:#?}",
-        name, args
-    );
     if let Some(functions) = functions.get(name) {
         for fun in functions {
             if fun.args.len() == args.len()
@@ -26,15 +22,32 @@ pub fn resolve_function<'a>(
                     .zip(args.iter())
                     .all(|(t1, t2)| *t1 == *t2)
             {
-                println!("[DEBUG] Function '{}' resolved: {:?}", name, fun);
                 return Some(fun);
             }
         }
     }
-    println!(
-        "[DEBUG] Could not resolve function '{}' :(\n[DEBUG] Available functions are: {:#?}",
-        name,
-        functions.get(name)
-    );
+    None
+}
+
+pub fn resolve_function_interpreter<'a>(
+    functions: &'a HashMap<String, Vec<FunctionAST>>,
+    name: &str,
+    args: &[ExprType],
+) -> Option<&'a FunctionAST> {
+    if let Some(functions) = functions.get(name) {
+        for fun in functions {
+            if fun.proto.args.len() == args.len()
+                && fun
+                    .proto
+                    .args
+                    .iter()
+                    .map(|(_, t)| t)
+                    .zip(args.iter())
+                    .all(|(t1, t2)| *t1 == *t2)
+            {
+                return Some(fun);
+            }
+        }
+    }
     None
 }

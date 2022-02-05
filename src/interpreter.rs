@@ -1,13 +1,15 @@
+// TODO: Bug with chained function calls and local variables
 use crate::ast::{
     ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, PrototypeAST, AST,
 };
 use crate::core::InternalFunction;
 use crate::interpreter::ExprResult::Number;
+use crate::util::resolve_function_interpreter;
 use crate::Console;
 use std::collections::HashMap;
 
 pub struct Interpreter {
-    functions: HashMap<String, FunctionAST>,
+    functions: HashMap<String, Vec<FunctionAST>>,
     main_function: Option<FunctionAST>,
 }
 
@@ -49,10 +51,10 @@ impl Interpreter {
                         (0, 0),
                     )
                     .set_internal();
-                    self.functions.insert(
-                        "print".to_string(),
-                        FunctionAST::new(proto, body, (0, 0), (0, 0)),
-                    );
+                    self.functions
+                        .entry("print".to_string())
+                        .or_insert_with(Vec::new)
+                        .push(FunctionAST::new(proto, body, (0, 0), (0, 0)));
                 }
                 InternalFunction::PrintInteger => {
                     let proto = PrototypeAST::new(
@@ -75,10 +77,10 @@ impl Interpreter {
                         (0, 0),
                     )
                     .set_internal();
-                    self.functions.insert(
-                        "print".to_string(),
-                        FunctionAST::new(proto, body, (0, 0), (0, 0)),
-                    );
+                    self.functions
+                        .entry("print".to_string())
+                        .or_insert_with(Vec::new)
+                        .push(FunctionAST::new(proto, body, (0, 0), (0, 0)));
                 }
             }
         }
@@ -96,7 +98,10 @@ impl Interpreter {
                     if fun.proto.name == "main" {
                         self.main_function = Some(fun);
                     } else {
-                        self.functions.insert(fun.proto.name.clone(), fun);
+                        self.functions
+                            .entry(fun.proto.name.clone())
+                            .or_insert_with(Vec::new)
+                            .push(fun);
                     }
                 }
             }
@@ -119,11 +124,19 @@ impl Interpreter {
     ) -> ExprResult {
         let s = args.get(0).expect(INTERNAL_ERROR);
         let result = self.eval_expr(s, local_variables);
-        if let ExprResult::String(s) = result {
-            println!("[Interpreter] {}", s);
-            return ExprResult::Number(s.len() as i32);
+        match result {
+            ExprResult::Number(n) => {
+                println!("[Interpreter] {}", n);
+                ExprResult::Number(n.to_string().len() as i32)
+            }
+            ExprResult::String(s) => {
+                println!("[Interpreter] {}", s);
+                ExprResult::Number(s.len() as i32)
+            }
+            _ => {
+                panic!("{}", INTERNAL_ERROR);
+            }
         }
-        panic!("{}", INTERNAL_ERROR);
     }
 
     fn eval_function_call(
@@ -131,21 +144,35 @@ impl Interpreter {
         fn_name: &str,
         args: &[ExprAST],
         internal: bool,
-        local_variables: &HashMap<String, ExprAST>,
+        old_local_variables: &HashMap<String, ExprAST>,
     ) -> ExprResult {
         if internal {
             match fn_name {
-                "print" => self.eval_print(args, local_variables),
+                "print" => self.eval_print(args, old_local_variables),
                 _ => panic!("unknown internal function"),
             }
         } else {
-            let fun = self.functions.get(fn_name).expect(INTERNAL_ERROR);
+            // let fun = self.functions.get(fn_name).expect(INTERNAL_ERROR);
+            let arg_types = args
+                .iter()
+                .cloned()
+                .map(|expr| expr.variant.type_of().expect(INTERNAL_ERROR))
+                .collect::<Vec<_>>();
+            let fun = resolve_function_interpreter(&self.functions, fn_name, &arg_types)
+                .expect(INTERNAL_ERROR);
 
             let mut local_variables = HashMap::new();
+            for (key, val) in old_local_variables {
+                local_variables.insert(key.clone(), val.clone());
+            }
             for (name, arg) in fun.proto.args.iter().map(|(a, _)| a).zip(args.iter()) {
                 local_variables.insert(name.to_string(), arg.clone());
             }
 
+            println!(
+                "Function call: {}. With local variables: {:#?}",
+                fn_name, local_variables
+            );
             let result = self.eval_expr(&fun.body, &local_variables);
             local_variables.clear();
             result

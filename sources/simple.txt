@@ -4,13 +4,18 @@ fn printf() -> void {
 }
 
 fn printf(i: int) -> int {
-    print("Hello from printf(i: int): ");
     print(i);
 }
 
+fn a(a: int) -> int {
+    b(a);
+}
+
+fn b(c: int) -> int {
+    c;
+}
+
+
 fn main() -> int {
-    print("Hello");
-    print(999);
-    printf(69);
-    42;
+    a(10);
 }

@@ -278,7 +278,6 @@ impl<'ctx> Compiler<'ctx> {
             unsafe {
                 function.delete();
             }
-            println!("DEBUG: {:?}", proto);
             Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
         }
     }

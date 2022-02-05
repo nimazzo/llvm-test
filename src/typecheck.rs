@@ -44,7 +44,6 @@ impl<'a> TypeChecker<'a> {
                 .or_insert_with(Vec::new)
                 .push(proto.clone());
         });
-        println!("47: {:#?}", functions);
 
         // store all known function types
         let function_definitions = ast.iter().filter_map(|node| {
@@ -83,7 +82,6 @@ impl<'a> TypeChecker<'a> {
                 .entry(fun.proto.name.clone())
                 .or_insert_with(Vec::new)
                 .push(fun.proto.clone());
-            println!("87: {:#?}", functions);
         }
 
         match main_function {
@@ -133,12 +131,11 @@ impl<'a> TypeChecker<'a> {
             .collect::<Vec<_>>();
 
         self.console.println(format!(
-            "[Type Checker] Found {} Function Definitions: \n{:#?}",
+            "[Type Checker] Found {} Function Definitions",
             self.context
                 .functions
                 .iter()
                 .fold(0, |acc, (_, funs)| acc + funs.len()),
-            self.context.functions
         ));
         let mut last_unresolved = 0;
         let mut round = 1;
@@ -247,6 +244,8 @@ impl<'a> TypeChecker<'a> {
                 }
             }
         }
+        self.console
+            .println("[Type Checker] Type Checking complete. All types match!");
         Ok(())
     }
 
