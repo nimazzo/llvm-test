@@ -12,6 +12,8 @@ pub fn resolve_function<'a>(
     name: &str,
     args: &[ExprType],
 ) -> Option<&'a PrototypeAST> {
+    // println!("DEBUG: Trying to resolve '{}' with args: {:?}", name, args);
+    // println!("DEBUG: Functions: {:#?}", functions);
     if let Some(functions) = functions.get(name) {
         for fun in functions {
             if function_matches_call(fun, args) {
@@ -19,6 +21,7 @@ pub fn resolve_function<'a>(
             }
         }
     }
+    // println!("DEBUG: NOT FOUND");
     None
 }
 
@@ -27,6 +30,8 @@ pub fn resolve_function_interpreter<'a>(
     name: &str,
     args: &[ExprType],
 ) -> Option<&'a FunctionAST> {
+    // println!("DEBUG: Trying to resolve '{}' with args: {:?}", name, args);
+    // println!("DEBUG: Functions: {:#?}", functions);
     if let Some(functions) = functions.get(name) {
         for fun in functions {
             if function_matches_call(&fun.proto, args) {
@@ -34,6 +39,7 @@ pub fn resolve_function_interpreter<'a>(
             }
         }
     }
+    // println!("DEBUG: NOT FOUND");
     None
 }
 

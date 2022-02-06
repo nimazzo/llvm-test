@@ -90,7 +90,8 @@ impl ProgramBuilder {
 }
 
 pub struct CompiledFunction {
-    name: String,
+    public_name: String,
+    internal_name: String,
     args: Vec<FunctionArgument>,
     ty: ExprType,
 }
@@ -108,14 +109,22 @@ impl Display for CompiledFunction {
             .map(|arg| format!("{}: {}", arg.name, arg.ty.as_str()))
             .collect::<Vec<String>>()
             .join(", ");
-        write!(f, "    fn {}({}) -> {}", self.name, args, self.ty.as_str())
+        write!(
+            f,
+            "    (internal: {}) fn {}({}) -> {}",
+            self.internal_name,
+            self.public_name,
+            args,
+            self.ty.as_str()
+        )
     }
 }
 
 impl CompiledFunction {
-    pub fn new(name: String, ty: ExprType) -> Self {
+    pub fn new(name: String, internal_name: String, ty: ExprType) -> Self {
         Self {
-            name,
+            public_name: name,
+            internal_name,
             args: vec![],
             ty,
         }

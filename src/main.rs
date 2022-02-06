@@ -2,6 +2,7 @@
 // todo: implement escape char in strings (mainly \n)
 // todo: improve compile errors (add context)
 // todo: define std in lang source not in rust
+// todo: check exit code of clang
 
 extern crate inkwell;
 

@@ -68,20 +68,30 @@ impl<'ctx> Compiler<'ctx> {
                     let public_name = proto.name.clone();
                     let body = &fun.body;
                     let fun = self.compile_fn_prototype(&public_name, &mut proto)?;
-                    functions.insert(public_name, (fun, proto, body));
+                    // functions.insert(public_name, (fun, proto, body));
+                    functions
+                        .entry(public_name)
+                        .or_insert_with(Vec::new)
+                        .push((fun, proto, body));
                 }
             }
         }
 
         // compile function bodies
-        for (public_name, (fun, proto, body)) in functions {
-            self.compile_fn_body(&proto, fun, body)?;
+        for (public_name, overloads) in functions {
+            for (fun, proto, body) in overloads {
+                self.compile_fn_body(&proto, fun, body)?;
 
-            let mut function = CompiledFunction::new(public_name, proto.ty.clone());
-            proto.args.iter().cloned().for_each(|arg| {
-                function.add_argument(arg.0, arg.1);
-            });
-            program_builder.add_function(function);
+                let mut function = CompiledFunction::new(
+                    public_name.clone(),
+                    proto.name.clone(),
+                    proto.ty.clone(),
+                );
+                proto.args.iter().cloned().for_each(|arg| {
+                    function.add_argument(arg.0, arg.1);
+                });
+                program_builder.add_function(function);
+            }
         }
 
         let code = self.module.write_bitcode_to_memory();
