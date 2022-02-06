@@ -1,12 +1,11 @@
 // fn main()
 
 fn a(a: int) -> int {
-    print("a() called");
     c(a, a, a, "a", 2 + 99, 2);
 }
 
 fn c(a: int, b: int, c: int, d: String, e: int, f: int) -> int {
-    d + e + f;
+    print(c + d + e);
 }
 
 fn main() -> int {

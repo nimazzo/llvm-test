@@ -164,9 +164,9 @@ impl<'a> TypeChecker<'a> {
 
                 let context = optionize(unresolved_symbol.context);
                 let pos = unresolved_symbol.pos;
-                match &unresolved_symbol.variant {
+                return match &unresolved_symbol.variant {
                     ExprVariant::FunctionCall { fn_name, args, .. } => {
-                        return if let Some(functions) = self.context.functions.get(fn_name) {
+                        if let Some(functions) = self.context.functions.get(fn_name) {
                             self.check_args_resolved(args)?;
                             let found = args
                                 .iter()
@@ -213,25 +213,21 @@ impl<'a> TypeChecker<'a> {
                             .into())
                         }
                     }
-                    ExprVariant::Variable { ident, .. } => {
-                        return Err(ParseError::unknown_variable(
-                            self.lexer.get_context(context),
-                            ident,
-                            here!(),
-                        )
-                        .with_pos(pos)
-                        .into());
-                    }
-                    _ => {
-                        return Err(ParseError::unknown_type(
-                            self.lexer.get_context(context),
-                            "Cannot resolve type of symbol",
-                            here!(),
-                        )
-                        .with_pos(unresolved_symbol.pos)
-                        .into());
-                    }
-                }
+                    ExprVariant::Variable { ident, .. } => Err(ParseError::unknown_variable(
+                        self.lexer.get_context(context),
+                        ident,
+                        here!(),
+                    )
+                    .with_pos(pos)
+                    .into()),
+                    _ => Err(ParseError::unknown_type(
+                        self.lexer.get_context(context),
+                        "Cannot resolve type of symbol",
+                        here!(),
+                    )
+                    .with_pos(unresolved_symbol.pos)
+                    .into()),
+                };
             }
             last_unresolved = unresolved;
             round += 1;
@@ -321,6 +317,10 @@ impl<'a> TypeChecker<'a> {
     fn check_expr_types(&self, expr: &ExprAST) -> Result<()> {
         match &expr.variant {
             ExprVariant::FunctionCall { fn_name, args, .. } => {
+                for arg in args {
+                    self.check_expr_types(arg)?;
+                }
+
                 let arg_types = args
                     .iter()
                     .cloned()
