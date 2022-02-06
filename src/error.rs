@@ -46,6 +46,7 @@ pub struct CompileError {
 }
 
 #[derive(Error, Debug)]
+#[allow(clippy::enum_variant_names)]
 pub enum CompileErrorType {
     #[error("Unable to compile program: {0}")]
     GenericCompilationError(String),

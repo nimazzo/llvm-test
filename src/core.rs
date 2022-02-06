@@ -5,7 +5,6 @@ use inkwell::AddressSpace;
 
 use crate::core::ExternalFuncton::Printf;
 use anyhow::Result;
-use inkwell::module::Linkage;
 
 pub enum InternalFunction {
     PrintString,
@@ -116,16 +115,12 @@ fn compile_print_string(compiler: &mut Compiler) -> Result<()> {
     )
     .set_internal();
 
-    compile_function(
-        compiler,
-        internal_name,
-        public_name,
-        args,
-        ret_type,
-        is_var_args,
-        linkage,
-        body,
-    )
+    let mut proto = PrototypeAST::new(internal_name.to_string(), args, ret_type, (0, 0), (0, 0))
+        .with_linkage(linkage)
+        .set_var_args(is_var_args);
+
+    let fun = compiler.compile_fn_prototype(public_name, &mut proto)?;
+    compiler.compile_fn(&proto, fun, &body).map(|_| ())
 }
 
 fn compile_print_integer(compiler: &mut Compiler) -> Result<()> {
@@ -150,31 +145,10 @@ fn compile_print_integer(compiler: &mut Compiler) -> Result<()> {
     )
     .set_internal();
 
-    compile_function(
-        compiler,
-        internal_name,
-        public_name,
-        args,
-        ret_type,
-        is_var_args,
-        linkage,
-        body,
-    )
-}
+    let mut proto = PrototypeAST::new(internal_name.to_string(), args, ret_type, (0, 0), (0, 0))
+        .with_linkage(linkage)
+        .set_var_args(is_var_args);
 
-fn compile_function(
-    compiler: &mut Compiler,
-    internal_name: &str,
-    public_name: &str,
-    args: Vec<(String, ExprType)>,
-    ret_type: ExprType,
-    is_var_args: bool,
-    linkage: Option<Linkage>,
-    body: ExprAST,
-) -> Result<()> {
-    let proto = PrototypeAST::new(internal_name.to_string(), args, ret_type, (0, 0), (0, 0));
-
-    compiler
-        .compile_fn(public_name, proto, linkage, is_var_args, body)
-        .map(|_| ())
+    let fun = compiler.compile_fn_prototype(public_name, &mut proto)?;
+    compiler.compile_fn(&proto, fun, &body).map(|_| ())
 }

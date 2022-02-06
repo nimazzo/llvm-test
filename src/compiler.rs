@@ -2,7 +2,7 @@ use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, PrototypeA
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
-use inkwell::module::{Linkage, Module};
+use inkwell::module::Module;
 use inkwell::values::{
     BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue,
 };
@@ -54,64 +54,70 @@ impl<'ctx> Compiler<'ctx> {
         crate::core::define_external_functions(self)?;
         crate::core::compile_internal_functions(self)?;
 
+        let mut functions = HashMap::new();
+        // compile prototypes
         for node in ast {
-            let (fun, params, ty) = match node {
+            match node {
                 ASTPrimitive::Extern(proto) => {
-                    let proto = proto.clone();
-                    let fun = self.compile_fn_prototype(&proto)?;
-                    (fun, proto.args, proto.ty.clone())
+                    let mut proto = proto.clone();
+                    let public_name = proto.name.clone();
+                    self.compile_fn_prototype(&public_name, &mut proto)?;
                 }
                 ASTPrimitive::Function(fun) => {
-                    let proto = fun.proto.clone();
-                    let body = fun.body.clone();
-                    let fun = self.compile_fn(&proto.name, proto.clone(), None, false, body)?;
-                    (fun, proto.args, proto.ty.clone())
+                    let mut proto = fun.proto.clone();
+                    let public_name = proto.name.clone();
+                    let body = &fun.body;
+                    let fun = self.compile_fn_prototype(&public_name, &mut proto)?;
+                    functions.insert(public_name, (fun, proto, body));
                 }
-            };
+            }
+        }
 
-            let mut function = CompiledFunction::new(fun.get_name().to_str()?.to_string(), ty);
-            params.iter().cloned().for_each(|arg| {
+        // compile function bodies
+        for (public_name, (fun, proto, body)) in functions {
+            self.compile_fn(&proto, fun, body)?;
+
+            let mut function = CompiledFunction::new(public_name, proto.ty.clone());
+            proto.args.iter().cloned().for_each(|arg| {
                 function.add_argument(arg.0, arg.1);
             });
             program_builder.add_function(function);
         }
+
         let code = self.module.write_bitcode_to_memory();
         program_builder.add_bitcode(code);
         program_builder.build()
     }
 
-    pub fn compile_fn_prototype(&mut self, proto: &PrototypeAST) -> Result<FunctionValue<'ctx>> {
-        let name = &proto.name;
+    pub fn compile_fn_prototype(
+        &mut self,
+        public_name: &str,
+        proto: &mut PrototypeAST,
+    ) -> Result<FunctionValue<'ctx>> {
         let args = &proto.args;
-        let mut proto = proto.clone();
+        let is_var_args = proto.is_var_args;
+        let linkage = proto.linkage;
 
-        let args_types = args
-            .iter()
-            .map(|(_, ty)| match ty {
-                ExprType::String => {
-                    BasicTypeEnum::from(self.context.i8_type().ptr_type(AddressSpace::Generic))
-                }
-                ExprType::Integer => BasicTypeEnum::from(self.context.i32_type()),
-                ExprType::Void => {
-                    unreachable!("[CRITICAL ERROR] Function arguments can't have void type")
-                }
-                _ => todo!(""),
-            })
-            .map(|ty| ty.into())
-            .collect::<Vec<BasicMetadataTypeEnum>>();
+        let mut args_types = vec![];
+        for (_, arg) in &proto.args {
+            if let Ok(bte) = BasicTypeEnum::try_from(self.to_llvm_type(arg)) {
+                args_types.push(BasicMetadataTypeEnum::from(bte));
+            } else {
+                return Err(
+                    CompileError::generic_compilation_error("Invalid Type", here!()).into(),
+                );
+            }
+        }
 
-        let fn_type = match &proto.ty {
-            ExprType::String => self
-                .context
-                .i8_type()
-                .ptr_type(AddressSpace::Generic)
-                .fn_type(&args_types, false),
-            ExprType::Integer => self.context.i32_type().fn_type(&args_types, false),
-            ExprType::Void => self.context.void_type().fn_type(&args_types, false),
-            _ => todo!(""),
+        let fn_type = if proto.ty == ExprType::Void {
+            self.context.void_type().fn_type(&args_types, is_var_args)
+        } else if let Ok(bt) = BasicTypeEnum::try_from(self.to_llvm_type(&proto.ty)) {
+            bt.fn_type(&args_types, is_var_args)
+        } else {
+            return Err(CompileError::generic_compilation_error("Invalid Type", here!()).into());
         };
 
-        let fn_val = self.module.add_function(name, fn_type, None);
+        let fn_val = self.module.add_function(&proto.name, fn_type, linkage);
         proto.name =
             unsafe { std::str::from_utf8_unchecked(fn_val.get_name().to_bytes()).to_string() };
 
@@ -120,11 +126,11 @@ impl<'ctx> Compiler<'ctx> {
         }
 
         // add function prototype to map of defined functions
+        // todo: maybe this is an error
         self.functions
-            .entry(name.clone())
+            .entry(public_name.to_string())
             .or_insert_with(Vec::new)
-            .push(proto);
-        // self.functions.insert(name.clone(), proto.clone());
+            .push(proto.clone());
         Ok(fn_val)
     }
 
@@ -220,45 +226,43 @@ impl<'ctx> Compiler<'ctx> {
 
     pub fn compile_fn(
         &mut self,
-        public_name: &str,
-        mut proto: PrototypeAST,
-        linkage: Option<Linkage>,
-        is_var_args: bool,
-        body: ExprAST,
+        proto: &PrototypeAST,
+        function: FunctionValue<'ctx>,
+        body: &ExprAST,
     ) -> Result<FunctionValue> {
-        let function = {
-            let mut args_types = vec![];
-            for (_, arg) in &proto.args {
-                if let Ok(bte) = BasicTypeEnum::try_from(self.to_llvm_type(arg)) {
-                    args_types.push(BasicMetadataTypeEnum::from(bte));
-                } else {
-                    return Err(
-                        CompileError::generic_compilation_error("Invalid Type", here!()).into(),
-                    );
-                }
-            }
-
-            let fn_type = if proto.ty == ExprType::Void {
-                self.context.void_type().fn_type(&args_types, is_var_args)
-            } else if let Ok(bt) = BasicTypeEnum::try_from(self.to_llvm_type(&proto.ty)) {
-                bt.fn_type(&args_types, is_var_args)
-            } else {
-                return Err(
-                    CompileError::generic_compilation_error("Invalid Type", here!()).into(),
-                );
-            };
-
-            self.module.add_function(&proto.name, fn_type, linkage)
-        };
-
-        // update internal fn name
-        proto.name =
-            unsafe { std::str::from_utf8_unchecked(function.get_name().to_bytes()).to_string() };
+        // let function = {
+        //     let mut args_types = vec![];
+        //     for (_, arg) in &proto.args {
+        //         if let Ok(bte) = BasicTypeEnum::try_from(self.to_llvm_type(arg)) {
+        //             args_types.push(BasicMetadataTypeEnum::from(bte));
+        //         } else {
+        //             return Err(
+        //                 CompileError::generic_compilation_error("Invalid Type", here!()).into(),
+        //             );
+        //         }
+        //     }
+        //
+        //     let fn_type = if proto.ty == ExprType::Void {
+        //         self.context.void_type().fn_type(&args_types, is_var_args)
+        //     } else if let Ok(bt) = BasicTypeEnum::try_from(self.to_llvm_type(&proto.ty)) {
+        //         bt.fn_type(&args_types, is_var_args)
+        //     } else {
+        //         return Err(
+        //             CompileError::generic_compilation_error("Invalid Type", here!()).into(),
+        //         );
+        //     };
+        //
+        //     self.module.add_function(&proto.name, fn_type, linkage)
+        // };
+        //
+        // // update internal fn name
+        // proto.name =
+        //     unsafe { std::str::from_utf8_unchecked(function.get_name().to_bytes()).to_string() };
 
         // Compile function body
-        self.alloc_fn_arguments(function, &proto)?;
+        self.alloc_fn_arguments(function, proto)?;
 
-        match self.compile_expr(&body) {
+        match self.compile_expr(body) {
             Some(bev) => self.builder.build_return(Some(&bev)),
             None => self.builder.build_return(None),
         };
@@ -269,10 +273,11 @@ impl<'ctx> Compiler<'ctx> {
 
         if function.verify(true) {
             // self.functions.insert(public_name.to_string(), proto);
-            self.functions
-                .entry(public_name.to_string())
-                .or_insert_with(Vec::new)
-                .push(proto);
+            // todo: maybe this is a bug
+            // self.functions
+            //     .entry(public_name.to_string())
+            //     .or_insert_with(Vec::new)
+            //     .push(proto);
             Ok(function)
         } else {
             unsafe {

@@ -1,4 +1,5 @@
 use crate::util::{resolve_function, INTERNAL_ERROR};
+use inkwell::module::Linkage;
 use inkwell::AddressSpace;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
@@ -97,6 +98,8 @@ impl Debug for ExprVariant {
 pub struct PrototypeAST {
     pub name: String,
     pub args: Vec<(String, ExprType)>,
+    pub is_var_args: bool,
+    pub linkage: Option<Linkage>,
     pub ty: ExprType,
     pub context: (usize, usize),
     pub pos: (usize, usize),
@@ -113,10 +116,22 @@ impl PrototypeAST {
         Self {
             name,
             args,
+            is_var_args: false,
+            linkage: None,
             ty,
             context,
             pos,
         }
+    }
+
+    pub fn with_linkage(mut self, linkage: Option<Linkage>) -> Self {
+        self.linkage = linkage;
+        self
+    }
+
+    pub fn set_var_args(mut self, is_var_args: bool) -> Self {
+        self.is_var_args = is_var_args;
+        self
     }
 }
 
