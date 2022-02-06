@@ -14,18 +14,7 @@ pub fn resolve_function<'a>(
 ) -> Option<&'a PrototypeAST> {
     if let Some(functions) = functions.get(name) {
         for fun in functions {
-            if !fun.is_var_args && fun.args.len() != args.len() {
-                return None;
-            }
-
-            if args.len() >= fun.args.len()
-                && fun
-                    .args
-                    .iter()
-                    .map(|(_, t)| t)
-                    .zip(args.iter())
-                    .all(|(t1, t2)| *t1 == *t2)
-            {
+            if function_matches_call(fun, args) {
                 return Some(fun);
             }
         }
@@ -40,23 +29,29 @@ pub fn resolve_function_interpreter<'a>(
 ) -> Option<&'a FunctionAST> {
     if let Some(functions) = functions.get(name) {
         for fun in functions {
-            if !fun.proto.is_var_args && fun.proto.args.len() != args.len() {
-                return None;
-            }
-            if args.len() >= fun.proto.args.len()
-                && fun
-                    .proto
-                    .args
-                    .iter()
-                    .map(|(_, t)| t)
-                    .zip(args.iter())
-                    .all(|(t1, t2)| *t1 == *t2)
-            {
+            if function_matches_call(&fun.proto, args) {
                 return Some(fun);
             }
         }
     }
     None
+}
+
+fn function_matches_call(proto: &PrototypeAST, args: &[ExprType]) -> bool {
+    if !proto.is_var_args && proto.args.len() != args.len() {
+        return false;
+    }
+    if args.len() >= proto.args.len()
+        && proto
+            .args
+            .iter()
+            .map(|(_, t)| t)
+            .zip(args.iter())
+            .all(|(t1, t2)| *t1 == *t2)
+    {
+        return true;
+    }
+    false
 }
 
 #[macro_export]
