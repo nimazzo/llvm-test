@@ -9,6 +9,7 @@ pub enum Token {
     Mul,
     Div,
     Fn,
+    Extern,
     Identifier(String),
     Whitespace(String),
     LeftParen,
@@ -20,6 +21,7 @@ pub enum Token {
     Comma,
     DoubleQuotes,
     RightArrow,
+    TripleDot,
     Comment(String),
     Other(char),
 }
@@ -34,6 +36,7 @@ impl Display for Token {
             Token::Mul => f.write_str("Mul('*')"),
             Token::Div => f.write_str("ForwardSlash('/')"),
             Token::Fn => f.write_str("Fn"),
+            Token::Extern => f.write_str("Extern"),
             Token::Identifier(id) => f.write_str(&format!("Identifier('{}')", id)),
             Token::Whitespace(_) => f.write_str("WS"),
             Token::LeftParen => f.write_str("LeftParen('(')"),
@@ -45,6 +48,7 @@ impl Display for Token {
             Token::Comma => f.write_str("Comma(',')"),
             Token::DoubleQuotes => f.write_str("DoubleQuotes('\"')"),
             Token::RightArrow => f.write_str("RightArrrow('->')"),
+            Token::TripleDot => f.write_str("TripleDot('...')"),
             Token::Comment(c) => f.write_str(&format!("Comment('{}')", c)),
             Token::Other(c) => f.write_str(&format!("Other('{}')", *c)),
         }
@@ -61,6 +65,7 @@ impl Token {
             Token::Mul => "*".to_string(),
             Token::Div => "/".to_string(),
             Token::Fn => "fn".to_string(),
+            Token::Extern => "extern".to_string(),
             Token::Identifier(id) => id.clone(),
             Token::Whitespace(c) => c.clone(),
             Token::LeftParen => "(".to_string(),
@@ -72,6 +77,7 @@ impl Token {
             Token::Comma => ",".to_string(),
             Token::DoubleQuotes => "\"".to_string(),
             Token::RightArrow => "->".to_string(),
+            Token::TripleDot => "...".to_string(),
             Token::Comment(c) => c.clone(),
             Token::Other(c) => c.to_string(),
         }

@@ -99,6 +99,14 @@ impl Lexer {
             self.idx_token_start = self.idx;
 
             match start {
+                '.' => {
+                    if self.peek(1) == Some('.') && self.peek(2) == Some('.') {
+                        self.advance_index();
+                        self.advance_index();
+                        self.advance_index();
+                        return Token::TripleDot;
+                    }
+                }
                 '"' => {
                     self.advance_index();
                     return Token::DoubleQuotes;
@@ -160,6 +168,7 @@ impl Lexer {
                 let identifier = self.parse_identifier();
                 match identifier.as_str() {
                     "fn" => Token::Fn,
+                    "extern" => Token::Extern,
                     _ => Token::Identifier(identifier),
                 }
             } else if start.is_ascii_digit() {

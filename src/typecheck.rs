@@ -27,13 +27,13 @@ impl<'a> TypeChecker<'a> {
         }
     }
 
-    pub fn run(&mut self, ast: &mut AST) -> Result<()> {
-        self.resolve_types(ast)?;
+    pub fn run(&mut self, ast: &mut AST, requires_main: bool) -> Result<()> {
+        self.resolve_types(ast, requires_main)?;
         self.assert_all_types_resolved(ast)?;
         self.check_types(ast)
     }
 
-    fn resolve_types(&mut self, ast: &mut AST) -> Result<()> {
+    fn resolve_types(&mut self, ast: &mut AST, requires_main: bool) -> Result<()> {
         self.console
             .println("[Type Checker] Starting Type Resolution Process");
         let internal_defs = crate::core::get_internal_definitions();
@@ -47,46 +47,58 @@ impl<'a> TypeChecker<'a> {
                 .push(proto.clone());
         });
 
-        // store all known function types
-        let function_definitions = ast.iter().filter_map(|node| {
-            if let ASTPrimitive::Function(fun) = node {
-                Some(fun)
-            } else {
-                None
-            }
-        });
-
         let mut main_function = None;
-        for fun in function_definitions {
-            if fun.proto.name == "main" {
-                main_function = Some(fun);
-            }
 
-            let arg_types = fun
-                .proto
+        let mut function_definitions = vec![];
+        for node in ast.iter() {
+            match node {
+                ASTPrimitive::Extern(proto) => function_definitions.push(proto),
+                ASTPrimitive::Function(fun) => {
+                    if fun.proto.name == "main" {
+                        if main_function.is_some() {
+                            let context = optionize(fun.context);
+                            return Err(ParseError::duplicate_function_definition(
+                                self.lexer.get_context(context),
+                                &fun.proto.name,
+                                here!(),
+                            )
+                            .with_pos(fun.pos)
+                            .into());
+                        }
+
+                        main_function = Some(fun.clone());
+                    }
+                    function_definitions.push(&fun.proto);
+                }
+            }
+        }
+
+        // check for duplicate function definitions
+        for proto in function_definitions {
+            let arg_types = proto
                 .args
                 .iter()
                 .cloned()
                 .map(|(_, t)| t)
                 .collect::<Vec<_>>();
-            if resolve_function(&functions, &fun.proto.name, &arg_types).is_some() {
-                let context = optionize(fun.context);
+            if resolve_function(&functions, &proto.name, &arg_types).is_some() {
+                let context = optionize(proto.context);
                 return Err(ParseError::duplicate_function_definition(
                     self.lexer.get_context(context),
-                    &fun.proto.name,
+                    &proto.name,
                     here!(),
                 )
-                .with_pos(fun.pos)
+                .with_pos(proto.pos)
                 .into());
             }
 
             functions
-                .entry(fun.proto.name.clone())
+                .entry(proto.name.clone())
                 .or_insert_with(Vec::new)
-                .push(fun.proto.clone());
+                .push(proto.clone());
         }
 
-        match main_function {
+        match &main_function {
             Some(fun) => {
                 let arg_count = fun.proto.args.len();
                 if arg_count != 0 {
@@ -115,7 +127,9 @@ impl<'a> TypeChecker<'a> {
                 }
             }
             None => {
-                return Err(ParseError::missing_main("".to_string(), here!()).into());
+                if requires_main {
+                    return Err(ParseError::missing_main("".to_string(), here!()).into());
+                }
             }
         }
 
@@ -139,6 +153,7 @@ impl<'a> TypeChecker<'a> {
                 .iter()
                 .fold(0, |acc, (_, funs)| acc + funs.len()),
         ));
+        println!("functions: {:#?}", self.context.functions);
         let mut last_unresolved = 0;
         let mut round = 1;
         loop {
@@ -282,14 +297,14 @@ impl<'a> TypeChecker<'a> {
                     self.check_expr_types(&fun.body)?;
                     let body_type = fun.body.variant.type_of().expect(INTERNAL_ERROR);
                     if body_type != fun.proto.ty {
-                        let context = optionize(fun.proto.context);
+                        let context = optionize(fun.body.context);
                         return Err(ParseError::unexpected_type(
                             self.lexer.get_context(context),
                             &fun.proto.ty.as_str(),
                             &body_type.as_str(),
                             here!(),
                         )
-                        .with_pos(fun.proto.pos)
+                        .with_pos(fun.body.pos)
                         .into());
                     }
                 }

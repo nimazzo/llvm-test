@@ -17,7 +17,7 @@ pub enum ASTPrimitive {
 impl Debug for ASTPrimitive {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ASTPrimitive::Extern(proto) => f.write_fmt(format_args!("{:#?}", proto)),
+            ASTPrimitive::Extern(proto) => f.debug_struct("Extern").field("proto", proto).finish(),
             ASTPrimitive::Function(function) => f
                 .debug_struct("Function")
                 .field("proto", &function.proto)
@@ -96,7 +96,7 @@ impl Debug for ExprVariant {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct PrototypeAST {
     pub name: String,
     pub args: Vec<(String, ExprType)>,
@@ -137,7 +137,7 @@ impl PrototypeAST {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionAST {
     pub proto: PrototypeAST,
     pub body: ExprAST,
@@ -161,7 +161,7 @@ impl FunctionAST {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct ExprAST {
     pub variant: ExprVariant,
     pub context: (usize, usize),
@@ -273,7 +273,7 @@ impl ExprVariant {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ExprVariant {
     Integer(i32),
     String(String),
@@ -394,7 +394,7 @@ impl ExprAST {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BinOp {
     Add,
     Minus,

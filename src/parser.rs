@@ -108,6 +108,11 @@ impl<'a> Parser<'a> {
                     let fun = self.parse_function()?;
                     program.push(ASTPrimitive::Function(fun));
                 }
+                Token::Extern => {
+                    let proto = self.parse_function_prototype()?;
+                    parse!(self, Token::Semicolon)?;
+                    program.push(ASTPrimitive::Extern(proto));
+                }
                 Token::Eof => {
                     break;
                 }
@@ -151,11 +156,24 @@ impl<'a> Parser<'a> {
             .println_verbose("[Parser] Trying to parse function prototype");
         let (context_start, _) = self.lexer.get_token_idx();
         let pos = self.lexer.get_token_pos();
+
+        if peek!(self) == Token::Extern {
+            parse!(self, Token::Extern)?;
+        }
+
         parse!(self, Token::Fn)?;
         let function_name = parse_identifier!(self)?;
 
         // Parse function arguments
         let function_args = self.parse_function_arguments()?;
+
+        // VarArgs: Check if Token is TripleDot
+        let mut is_var_args = false;
+        if peek!(self) == Token::TripleDot {
+            is_var_args = true;
+            parse!(self, Token::TripleDot)?;
+            parse!(self, Token::RightParen)?;
+        }
 
         // Parse function return type
         let ret_type = self.parse_function_return_type()?;
@@ -169,7 +187,8 @@ impl<'a> Parser<'a> {
             ret_type,
             (context_start, context_end),
             pos,
-        ))
+        )
+        .set_var_args(is_var_args))
     }
 
     fn parse_function_return_type(&mut self) -> Result<ExprType> {
@@ -191,6 +210,10 @@ impl<'a> Parser<'a> {
         parse!(self, Token::LeftParen)?;
         if peek!(self) != Token::RightParen {
             loop {
+                if peek!(self) == Token::TripleDot {
+                    return Ok(function_args);
+                }
+
                 let arg_name = parse_identifier!(self)?;
                 parse!(self, Token::Colon)?;
                 skip_whitespace_and_comments!(self);
