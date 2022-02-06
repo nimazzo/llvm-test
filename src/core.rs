@@ -46,7 +46,7 @@ fn get_print_string_definition() -> PrototypeAST {
 fn get_print_integer_definition() -> PrototypeAST {
     PrototypeAST::new(
         "print".to_string(),
-        vec![("s".to_string(), ExprType::Integer)],
+        vec![("n".to_string(), ExprType::Integer)],
         ExprType::Integer,
         (0, 0),
         (0, 0),
@@ -101,7 +101,7 @@ fn compile_print_string(compiler: &mut Compiler) -> Result<()> {
 
     let args = vec![("s".to_string(), ExprType::String)];
     let ret_type = ExprType::Integer;
-    let is_var_args = true;
+    let is_var_args = false;
     let linkage = None;
 
     // compile function body
@@ -131,7 +131,7 @@ fn compile_print_integer(compiler: &mut Compiler) -> Result<()> {
 
     let args = vec![("n".to_string(), ExprType::Integer)];
     let ret_type = ExprType::Integer;
-    let is_var_args = true;
+    let is_var_args = false;
     let linkage = None;
 
     // compile function body

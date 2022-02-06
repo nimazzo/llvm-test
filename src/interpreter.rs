@@ -1,6 +1,4 @@
-use crate::ast::{
-    ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, PrototypeAST, AST,
-};
+use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, AST};
 use crate::core::InternalFunction;
 use crate::interpreter::ExprResult::Number;
 use crate::util::resolve_function_interpreter;
@@ -29,17 +27,20 @@ impl Interpreter {
             InternalFunction::PrintString,
             InternalFunction::PrintInteger,
         ];
-        for function in functions {
+
+        let internal_definitions = crate::core::get_internal_definitions();
+
+        for (function, proto) in functions.iter().zip(internal_definitions.into_iter()) {
             match function {
                 InternalFunction::PrintString => {
-                    let proto = PrototypeAST::new(
-                        "print".to_string(),
-                        vec![("s".to_string(), ExprType::String)],
-                        ExprType::Integer,
-                        (0, 0),
-                        (0, 0),
-                    )
-                    .set_var_args(true);
+                    // let proto = PrototypeAST::new(
+                    //     "print".to_string(),
+                    //     vec![("s".to_string(), ExprType::String)],
+                    //     ExprType::Integer,
+                    //     (0, 0),
+                    //     (0, 0),
+                    // )
+                    // .set_var_args(true);
                     let body = ExprAST::new_function_call(
                         "print".to_string(),
                         vec![ExprAST::new_variable(
@@ -59,14 +60,14 @@ impl Interpreter {
                         .push(FunctionAST::new(proto, body, (0, 0), (0, 0)));
                 }
                 InternalFunction::PrintInteger => {
-                    let proto = PrototypeAST::new(
-                        "print".to_string(),
-                        vec![("n".to_string(), ExprType::Integer)],
-                        ExprType::Integer,
-                        (0, 0),
-                        (0, 0),
-                    )
-                    .set_var_args(true);
+                    // let proto = PrototypeAST::new(
+                    //     "print".to_string(),
+                    //     vec![("n".to_string(), ExprType::Integer)],
+                    //     ExprType::Integer,
+                    //     (0, 0),
+                    //     (0, 0),
+                    // )
+                    // .set_var_args(true);
                     let body = ExprAST::new_function_call(
                         "print".to_string(),
                         vec![ExprAST::new_variable(
