@@ -1,8 +1,8 @@
 use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, AST};
+use crate::console::Console;
 use crate::core::InternalFunction;
 use crate::interpreter::ExprResult::Number;
 use crate::util::resolve_function_interpreter;
-use crate::Console;
 use std::collections::HashMap;
 
 pub struct Interpreter {

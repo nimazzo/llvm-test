@@ -2,9 +2,11 @@ use crate::ast::{
     ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, PrototypeAST, TypeContext,
     AST,
 };
+use crate::console::Console;
 use crate::error::ParseError;
+use crate::here;
+use crate::lexer::Lexer;
 use crate::util::{optionize, resolve_function};
-use crate::{here, Console, Lexer};
 use anyhow::Result;
 use std::collections::HashMap;
 

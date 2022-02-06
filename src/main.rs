@@ -6,34 +6,21 @@
 
 extern crate inkwell;
 
-use crate::compiler::Compiler;
-use crate::lexer::Lexer;
-use crate::program::CompiledProgram;
 use clap::{ErrorKind, IntoApp, Parser, Subcommand};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::console::Console;
-use crate::error::CompileError;
-use crate::interpreter::Interpreter;
-use crate::typecheck::TypeChecker;
 use anyhow::Result;
-
-mod ast;
-mod compiler;
-mod console;
-mod core;
-mod error;
-mod interpreter;
-mod lexer;
-mod measurement;
-mod parser;
-mod program;
-mod token;
-mod typecheck;
-mod util;
+use llvm_test::compiler::Compiler;
+use llvm_test::console::Console;
+use llvm_test::error::CompileError;
+use llvm_test::interpreter::Interpreter;
+use llvm_test::lexer::Lexer;
+use llvm_test::program::CompiledProgram;
+use llvm_test::typecheck::TypeChecker;
+use llvm_test::{display_timer, here, measurement, parser, start_timer, stop_timer};
 
 #[derive(clap::Parser)]
 #[clap(name = "Language Compiler", version, about = "Compiles source files")]

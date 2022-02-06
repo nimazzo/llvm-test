@@ -1,8 +1,8 @@
 use crate::ast::{ExprAST, ExprType, PrototypeAST};
 use crate::core::InternalFunction::{PrintInteger, PrintString};
-use crate::Compiler;
 use inkwell::AddressSpace;
 
+use crate::compiler::Compiler;
 use crate::core::ExternalFunction::Printf;
 use anyhow::Result;
 

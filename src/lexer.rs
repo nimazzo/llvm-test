@@ -1,5 +1,5 @@
+use crate::console::Console;
 use crate::token::Token;
-use crate::Console;
 
 #[derive(Clone)]
 pub struct Lexer {

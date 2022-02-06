@@ -1,9 +1,10 @@
 use crate::token::Token;
-use crate::{Console, Lexer};
 
 use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, FunctionAST, PrototypeAST, AST};
+use crate::console::Console;
 use crate::error::ParseError;
 use crate::here;
+use crate::lexer::Lexer;
 use crate::util::optionize;
 use anyhow::Result;
 
