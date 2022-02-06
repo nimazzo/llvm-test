@@ -31,6 +31,10 @@ pub enum ParseErrorType {
     MissingMain,
     #[error("Wrong Main Function Signature: {0}")]
     WrongMainSignature(String),
+    #[error("Unknown Function: {0}")]
+    UnknownFunction(String),
+    #[error("Unknown variable: {0}")]
+    UnknownVariable(String),
     #[error("Unexpected end of file")]
     UnexpectedEOF,
 }
@@ -47,10 +51,6 @@ pub enum CompileErrorType {
     GenericCompilationError(String),
     #[error("Unable to JIT compile function: {0}")]
     JITCompilationError(String),
-    #[error("Unknown variable: {0}")]
-    UnknownVariable(String),
-    #[error("Unknown Function: {0}")]
-    UnknownFunction(String),
     #[error("Runtime Error: {0}")]
     RuntimeError(String),
 }
@@ -70,20 +70,6 @@ impl CompileError {
         }
     }
 
-    pub fn unknown_variable(msg: &str, location: String) -> Self {
-        Self {
-            error_type: CompileErrorType::UnknownVariable(msg.to_string()),
-            location,
-        }
-    }
-
-    pub fn unknown_function(msg: &str, location: String) -> Self {
-        Self {
-            error_type: CompileErrorType::UnknownFunction(msg.to_string()),
-            location,
-        }
-    }
-
     pub fn runtime_error(msg: &str, location: String) -> Self {
         Self {
             error_type: CompileErrorType::RuntimeError(msg.to_string()),
@@ -97,6 +83,26 @@ impl ParseError {
         Self {
             context,
             error_type: ParseErrorType::MissingToken(token.to_string()),
+            location,
+            row: None,
+            col: None,
+        }
+    }
+
+    pub fn unknown_variable(context: String, ident: &str, location: String) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::UnknownVariable(ident.to_string()),
+            location,
+            row: None,
+            col: None,
+        }
+    }
+
+    pub fn unknown_function(context: String, ident: &str, location: String) -> Self {
+        Self {
+            context,
+            error_type: ParseErrorType::UnknownFunction(ident.to_string()),
             location,
             row: None,
             col: None,

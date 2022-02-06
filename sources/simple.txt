@@ -2,14 +2,13 @@
 
 fn a(a: int) -> int {
     print("a() called");
-    b(a);
+    c(a, a, a, a, a, a);
 }
 
-fn b(a: int) -> int {
-    print("b() called");
-    c(a);
+fn c(a: int, b: int, c: int, d: int, e: int, f: int) -> int {
+    print(a + b);
 }
 
 fn main() -> int {
-    a(10);
+    a(1);
 }
