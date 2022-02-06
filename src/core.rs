@@ -97,12 +97,10 @@ pub fn compile_internal_functions(compiler: &mut Compiler) -> Result<()> {
 
 fn compile_print_string(compiler: &mut Compiler) -> Result<()> {
     let internal_name = "__internal_print_string";
-    let public_name = "print";
 
-    let args = vec![("s".to_string(), ExprType::String)];
-    let ret_type = ExprType::Integer;
-    let is_var_args = false;
-    let linkage = None;
+    let mut proto = get_print_string_definition();
+    let public_name = proto.name.clone();
+    proto.name = internal_name.to_string();
 
     // compile function body
     let body = ExprAST::new_function_call(
@@ -117,22 +115,16 @@ fn compile_print_string(compiler: &mut Compiler) -> Result<()> {
     )
     .set_internal();
 
-    let mut proto = PrototypeAST::new(internal_name.to_string(), args, ret_type, (0, 0), (0, 0))
-        .with_linkage(linkage)
-        .set_var_args(is_var_args);
-
-    let fun = compiler.compile_fn_prototype(public_name, &mut proto)?;
+    let fun = compiler.compile_fn_prototype(&public_name, &mut proto)?;
     compiler.compile_fn_body(&proto, fun, &body).map(|_| ())
 }
 
 fn compile_print_integer(compiler: &mut Compiler) -> Result<()> {
     let internal_name = "__internal_print_integer";
-    let public_name = "print";
 
-    let args = vec![("n".to_string(), ExprType::Integer)];
-    let ret_type = ExprType::Integer;
-    let is_var_args = false;
-    let linkage = None;
+    let mut proto = get_print_integer_definition();
+    let public_name = proto.name.clone();
+    proto.name = internal_name.to_string();
 
     // compile function body
     let body = ExprAST::new_function_call(
@@ -147,10 +139,6 @@ fn compile_print_integer(compiler: &mut Compiler) -> Result<()> {
     )
     .set_internal();
 
-    let mut proto = PrototypeAST::new(internal_name.to_string(), args, ret_type, (0, 0), (0, 0))
-        .with_linkage(linkage)
-        .set_var_args(is_var_args);
-
-    let fun = compiler.compile_fn_prototype(public_name, &mut proto)?;
+    let fun = compiler.compile_fn_prototype(&public_name, &mut proto)?;
     compiler.compile_fn_body(&proto, fun, &body).map(|_| ())
 }
