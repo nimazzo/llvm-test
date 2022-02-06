@@ -40,7 +40,10 @@ pub fn resolve_function_interpreter<'a>(
 ) -> Option<&'a FunctionAST> {
     if let Some(functions) = functions.get(name) {
         for fun in functions {
-            if fun.proto.args.len() == args.len()
+            if !fun.proto.is_var_args && fun.proto.args.len() != args.len() {
+                return None;
+            }
+            if args.len() >= fun.proto.args.len()
                 && fun
                     .proto
                     .args

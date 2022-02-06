@@ -66,12 +66,11 @@ impl Debug for ExprVariant {
                 args,
                 ty,
                 internal,
-                is_var_args,
             } => f
                 .debug_struct("FunctionCall")
                 .field("name", fn_name)
                 .field("args", args)
-                .field("is_var_args", is_var_args)
+                // .field("is_var_args", is_var_args)
                 .field(
                     "type",
                     if ty.is_none() {
@@ -287,7 +286,6 @@ pub enum ExprVariant {
         args: Vec<ExprAST>,
         ty: Option<ExprType>,
         internal: bool,
-        is_var_args: bool,
     },
     BinaryExpr {
         op: BinOp,
@@ -366,7 +364,6 @@ impl ExprAST {
                 args,
                 ty,
                 internal: false,
-                is_var_args: false,
             },
             context,
             pos,

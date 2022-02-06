@@ -38,7 +38,8 @@ impl Interpreter {
                         ExprType::Integer,
                         (0, 0),
                         (0, 0),
-                    );
+                    )
+                    .set_var_args(true);
                     let body = ExprAST::new_function_call(
                         "print".to_string(),
                         vec![ExprAST::new_variable(
@@ -64,7 +65,8 @@ impl Interpreter {
                         ExprType::Integer,
                         (0, 0),
                         (0, 0),
-                    );
+                    )
+                    .set_var_args(true);
                     let body = ExprAST::new_function_call(
                         "print".to_string(),
                         vec![ExprAST::new_variable(
