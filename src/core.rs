@@ -40,6 +40,7 @@ fn get_print_string_definition() -> PrototypeAST {
         (0, 0),
         (0, 0),
     )
+    .set_var_args(true)
 }
 
 fn get_print_integer_definition() -> PrototypeAST {
@@ -50,6 +51,7 @@ fn get_print_integer_definition() -> PrototypeAST {
         (0, 0),
         (0, 0),
     )
+    .set_var_args(true)
 }
 
 // Define external Functions

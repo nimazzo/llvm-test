@@ -14,7 +14,11 @@ pub fn resolve_function<'a>(
 ) -> Option<&'a PrototypeAST> {
     if let Some(functions) = functions.get(name) {
         for fun in functions {
-            if fun.args.len() == args.len()
+            if !fun.is_var_args && fun.args.len() != args.len() {
+                return None;
+            }
+
+            if args.len() >= fun.args.len()
                 && fun
                     .args
                     .iter()

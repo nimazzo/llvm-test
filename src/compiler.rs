@@ -231,6 +231,7 @@ impl<'ctx> Compiler<'ctx> {
                 args,
                 internal,
                 ty,
+                ..
             } => {
                 let (internal_fn_name, ret_type) = if *internal {
                     (

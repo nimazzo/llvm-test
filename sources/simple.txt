@@ -6,5 +6,5 @@ fn main() -> int {
 }
 
 fn hello() -> int {
-    print("Hello");
+    print("Hello", "World");
 }
