@@ -1,6 +1,10 @@
 // fn main()
 
+fn hello() -> int {
+    print("Hello");
+    12 + 33;
+}
+
 fn main() -> int {
-    print("Hello, World");
-    0;
+    hello();
 }

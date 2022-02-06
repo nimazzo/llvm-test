@@ -16,25 +16,84 @@ pub enum ASTPrimitive {
 impl Debug for ASTPrimitive {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ASTPrimitive::Extern(proto) => {
-                if f.alternate() {
-                    f.write_fmt(format_args!("{:#?}", proto))
-                } else {
-                    f.write_fmt(format_args!("{:?}", proto))
-                }
-            }
-            ASTPrimitive::Function(function) => {
-                if f.alternate() {
-                    f.write_fmt(format_args!("{:#?}", function))
-                } else {
-                    f.write_fmt(format_args!("{:?}", function))
-                }
-            }
+            ASTPrimitive::Extern(proto) => f.write_fmt(format_args!("{:#?}", proto)),
+            ASTPrimitive::Function(function) => f
+                .debug_struct("Function")
+                .field("proto", &function.proto)
+                .field("body", &function.body)
+                .finish(),
         }
     }
 }
 
-#[derive(Debug, Clone)]
+impl Debug for PrototypeAST {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Prototype")
+            .field("name", &self.name)
+            .field("args", &self.args)
+            .field("type", &self.ty)
+            .finish()
+    }
+}
+
+impl Debug for ExprAST {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:#?}", self.variant))
+    }
+}
+
+impl Debug for ExprVariant {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExprVariant::Integer(n) => f.write_fmt(format_args!("Integer('{}')", n)),
+            ExprVariant::String(s) => f.write_fmt(format_args!("String('{}')", s)),
+            ExprVariant::Variable { ident, ty } => f
+                .debug_struct("Variable")
+                .field("ident", ident)
+                .field(
+                    "type",
+                    if ty.is_none() {
+                        &"UNRESOLVED"
+                    } else {
+                        ty.as_ref().unwrap()
+                    },
+                )
+                .finish(),
+            ExprVariant::FunctionCall {
+                fn_name,
+                args,
+                ty,
+                internal,
+            } => f
+                .debug_struct("FunctionCall")
+                .field("name", fn_name)
+                .field("args", args)
+                .field(
+                    "type",
+                    if ty.is_none() {
+                        &"UNRESOLVED"
+                    } else {
+                        ty.as_ref().unwrap()
+                    },
+                )
+                .field("internal", internal)
+                .finish(),
+            ExprVariant::BinaryExpr { op, lhs, rhs } => f
+                .debug_struct(&format!("{:?}", op))
+                .field("lhs", lhs)
+                .field("rhs", rhs)
+                .finish(),
+            ExprVariant::Sequence { lhs, rhs } => f
+                .debug_struct("Sequence")
+                .field("lhs", lhs)
+                .field("rhs", rhs)
+                .finish(),
+            ExprVariant::Nop => f.write_str("NOP"),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct PrototypeAST {
     pub name: String,
     pub args: Vec<(String, ExprType)>,
@@ -85,7 +144,7 @@ impl FunctionAST {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ExprAST {
     pub variant: ExprVariant,
     pub context: (usize, usize),
@@ -197,7 +256,7 @@ impl ExprVariant {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ExprVariant {
     Integer(i32),
     String(String),

@@ -2,6 +2,7 @@
 // todo: implement escape char in strings (mainly \n)
 // todo: improve compile errors (add context)
 // todo: try to compile all function prototypes first so that they can be called before definition
+// todo: define std in lang source not in rust
 
 extern crate inkwell;
 
