@@ -1,13 +1,6 @@
 // fn main()
 
-fn a(a: int) -> int {
-    c(a, a, a, "a", 2 + 99, 2);
-}
-
-fn c(a: int, b: int, c: int, d: String, e: int, f: int) -> int {
-    print(c + d + e);
-}
-
 fn main() -> int {
-    a(1);
+    print("Hello, World");
+    0;
 }

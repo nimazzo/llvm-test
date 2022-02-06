@@ -1,9 +1,7 @@
 // todo: prevent user from defining illegal identifiers (e.g. duplicate functions or variable called main)
 // todo: implement escape char in strings (mainly \n)
-// todo: implement print function for integers
 // todo: improve compile errors (add context)
 // todo: try to compile all function prototypes first so that they can be called before definition
-// todo: zip doesn't work because hashmaps are not ordered...
 
 extern crate inkwell;
 
