@@ -13,7 +13,7 @@ use clap::{ErrorKind, IntoApp, Parser, Subcommand};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 
 use crate::console::Console;
 use crate::error::CompileError;
@@ -280,7 +280,7 @@ fn create_bitcode(
     program.dump_bc(out_path.as_ref().with_extension("bc"))
 }
 
-fn create_obj_file(out_path: impl AsRef<Path>, console: Console) -> Result<Output> {
+fn create_obj_file(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
     console.println("[Compiler] Generating Object File");
     let bc_path = out_path.as_ref().with_extension("bc");
     let obj_path = out_path.as_ref().with_extension("o");
@@ -290,19 +290,57 @@ fn create_obj_file(out_path: impl AsRef<Path>, console: Console) -> Result<Outpu
         .arg(obj_path)
         .arg(bc_path);
     console.println(format!("[CMD] {:?}", cmd));
-    cmd.output()
-        .map_err(|err| CompileError::generic_compilation_error(&err.to_string(), here!()).into())
+    match cmd.output() {
+        Ok(output) => {
+            if output.status.success() {
+                Ok(())
+            } else {
+                let stdout = String::from_utf8_lossy(output.stdout.as_slice());
+                let stderr = String::from_utf8_lossy(output.stderr.as_slice());
+                let mut msg = format!("llc exited with status code: {}", output.status);
+                if console.verbose {
+                    msg = format!(
+                        "{}\
+                        \nclang stdout: {}\
+                        \nclang stderr: {}",
+                        msg, stdout, stderr
+                    );
+                }
+                Err(CompileError::generic_compilation_error(&msg, here!()).into())
+            }
+        }
+        Err(err) => Err(CompileError::generic_compilation_error(&err.to_string(), here!()).into()),
+    }
 }
 
-fn create_executable(out_path: impl AsRef<Path>, console: Console) -> Result<Output> {
+fn create_executable(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
     console.println("[Compiler] Generating Executable File");
     let obj_path = out_path.as_ref().with_extension("o");
     let exe_path = out_path.as_ref().with_extension("exe");
     let mut cmd = Command::new("clang");
     cmd.arg(obj_path).arg("-o").arg(exe_path);
     console.println(format!("[CMD] {:?}", cmd));
-    cmd.output()
-        .map_err(|err| CompileError::generic_compilation_error(&err.to_string(), here!()).into())
+    match cmd.output() {
+        Ok(output) => {
+            if output.status.success() {
+                Ok(())
+            } else {
+                let stdout = String::from_utf8_lossy(output.stdout.as_slice());
+                let stderr = String::from_utf8_lossy(output.stderr.as_slice());
+                let mut msg = format!("clang exited with status code: {}", output.status);
+                if console.verbose {
+                    msg = format!(
+                        "{}\
+                        \nclang stdout: {}\
+                        \nclang stderr: {}",
+                        msg, stdout, stderr
+                    );
+                }
+                Err(CompileError::generic_compilation_error(&msg, here!()).into())
+            }
+        }
+        Err(err) => Err(CompileError::generic_compilation_error(&err.to_string(), here!()).into()),
+    }
 }
 
 fn cleanup(out_path: impl AsRef<Path>, console: Console) {
