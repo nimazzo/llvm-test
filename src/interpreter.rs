@@ -149,6 +149,8 @@ impl Interpreter {
         internal: bool,
         old_local_variables: &HashMap<String, ExprAST>,
     ) -> ExprResult {
+        println!("Function call: {} with args: {:#?}", fn_name, args);
+        println!("local variables: {:#?}", old_local_variables);
         if internal {
             match fn_name {
                 "print" => self.eval_print(args, old_local_variables),
@@ -156,6 +158,15 @@ impl Interpreter {
             }
         } else {
             // let fun = self.functions.get(fn_name).expect(INTERNAL_ERROR);
+            let args = args
+                .iter()
+                .map(|expr| match self.eval_expr(expr, old_local_variables) {
+                    Number(n) => ExprAST::new_integer(n, (0, 0), (0, 0)),
+                    ExprResult::String(s) => ExprAST::new_string(s, (0, 0), (0, 0)),
+                    _ => panic!("{}", INTERNAL_ERROR),
+                })
+                .collect::<Vec<_>>();
+
             let arg_types = args
                 .iter()
                 .cloned()
@@ -176,6 +187,19 @@ impl Interpreter {
                 };
                 local_variables.insert(name.to_string(), arg);
             }
+
+            // let mut evaluated_args = vec![];
+            // for evaluated_arg in args
+            //     .iter()
+            //     .map(|expr| self.eval_expr(expr, old_local_variables))
+            // {
+            //     match evaluated_arg {
+            //         ExprResult::Number(_) | ExprResult::String(_) => {
+            //             evaluated_args.push(evaluated_arg);
+            //         }
+            //         _ => panic!("{}", INTERNAL_ERROR),
+            //     }
+            // }
 
             let result = self.eval_expr(&fun.body, &local_variables);
             local_variables.clear();
@@ -222,12 +246,7 @@ impl Interpreter {
 
         match (&lhs_eval, &rhs_eval) {
             (Number(a), Number(b)) => ExprResult::Number(a + b),
-            _ => ExprResult::TypeMismatchError(format!(
-                "ERROR: Incompatible types: No {:?} implementation for lhs: {:?}, rhs: {:?}",
-                BinOp::Add,
-                lhs_eval,
-                rhs_eval
-            )),
+            _ => panic!("{}", INTERNAL_ERROR),
         }
     }
 
@@ -242,12 +261,7 @@ impl Interpreter {
 
         match (&lhs_eval, &rhs_eval) {
             (Number(a), Number(b)) => ExprResult::Number(a - b),
-            _ => ExprResult::TypeMismatchError(format!(
-                "ERROR: Incompatible types: No {:?} implementation for lhs: {:?}, rhs: {:?}",
-                BinOp::Minus,
-                lhs_eval,
-                rhs_eval
-            )),
+            _ => panic!("{}", INTERNAL_ERROR),
         }
     }
 
@@ -262,12 +276,7 @@ impl Interpreter {
 
         match (&lhs_eval, &rhs_eval) {
             (Number(a), Number(b)) => ExprResult::Number(a * b),
-            _ => ExprResult::TypeMismatchError(format!(
-                "ERROR: Incompatible types: No {:?} implementation for lhs: {:?}, rhs: {:?}",
-                BinOp::Mul,
-                lhs_eval,
-                rhs_eval
-            )),
+            _ => panic!("{}", INTERNAL_ERROR),
         }
     }
 
@@ -282,12 +291,7 @@ impl Interpreter {
 
         match (&lhs_eval, &rhs_eval) {
             (Number(a), Number(b)) => ExprResult::Number(a / b),
-            _ => ExprResult::TypeMismatchError(format!(
-                "ERROR: Incompatible types: No {:?} implementation for lhs: {:?}, rhs: {:?}",
-                BinOp::Div,
-                lhs_eval,
-                rhs_eval
-            )),
+            _ => panic!("{}", INTERNAL_ERROR),
         }
     }
 }
@@ -297,5 +301,4 @@ enum ExprResult {
     Number(i32),
     String(String),
     Null,
-    TypeMismatchError(String),
 }

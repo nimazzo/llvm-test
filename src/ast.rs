@@ -99,8 +99,10 @@ impl ExprVariant {
             ExprVariant::String(_) => Some(ExprType::String),
             ExprVariant::Variable { ty, .. } => ty.clone(),
             ExprVariant::FunctionCall { ty, .. } => ty.clone(),
-            ExprVariant::BinaryExpr { lhs, .. } => lhs.variant.type_of(),
-            ExprVariant::Sequence { rhs, .. } => rhs.variant.type_of(),
+            ExprVariant::BinaryExpr { lhs, rhs, .. } => {
+                lhs.variant.type_of().and(rhs.variant.type_of())
+            }
+            ExprVariant::Sequence { lhs, rhs } => lhs.variant.type_of().and(rhs.variant.type_of()),
             ExprVariant::Nop => Some(ExprType::Void),
         }
     }

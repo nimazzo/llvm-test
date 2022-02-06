@@ -166,7 +166,7 @@ impl<'a> TypeChecker<'a> {
                 let pos = unresolved_symbol.pos;
                 match &unresolved_symbol.variant {
                     ExprVariant::FunctionCall { fn_name, args, .. } => {
-                        if let Some(functions) = self.context.functions.get(fn_name) {
+                        return if let Some(functions) = self.context.functions.get(fn_name) {
                             self.check_args_resolved(args)?;
                             let found = args
                                 .iter()
@@ -193,22 +193,22 @@ impl<'a> TypeChecker<'a> {
                                 .collect::<Vec<String>>()
                                 .join(", ");
 
-                            return Err(ParseError::wrong_arguments(
+                            Err(ParseError::wrong_arguments(
                                 self.lexer.get_context(context),
                                 &found,
                                 &expected,
                                 here!(),
                             )
                             .with_pos(pos)
-                            .into());
+                            .into())
                         } else {
-                            return Err(ParseError::unknown_function(
+                            Err(ParseError::unknown_function(
                                 self.lexer.get_context(context),
                                 fn_name,
                                 here!(),
                             )
                             .with_pos(pos)
-                            .into());
+                            .into())
                         }
                     }
                     ExprVariant::Variable { ident, .. } => {
@@ -244,33 +244,29 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_args_resolved(&self, args: &Vec<ExprAST>) -> Result<()> {
-        if let Some(expr) = args
-            .iter()
-            .filter(|expr| expr.variant.type_of().is_none())
-            .next()
-        {
+    fn check_args_resolved(&self, args: &[ExprAST]) -> Result<()> {
+        if let Some(expr) = args.iter().find(|expr| expr.variant.type_of().is_none()) {
             let context = self.lexer.get_context(optionize(expr.context));
             let pos = expr.pos;
             match &expr.variant {
                 ExprVariant::Variable { ident, .. } => {
-                    return Err(ParseError::unknown_variable(context, &ident, here!())
+                    return Err(ParseError::unknown_variable(context, ident, here!())
                         .with_pos(pos)
                         .into());
                 }
                 ExprVariant::FunctionCall { fn_name, args, .. } => {
-                    self.check_args_resolved(&args)?;
-                    return Err(ParseError::unknown_function(context, &fn_name, here!())
+                    self.check_args_resolved(args)?;
+                    return Err(ParseError::unknown_function(context, fn_name, here!())
                         .with_pos(pos)
                         .into());
                 }
                 ExprVariant::BinaryExpr { lhs, rhs, .. } => {
-                    self.check_args_resolved(&vec![lhs.as_ref().clone()])?;
-                    self.check_args_resolved(&vec![rhs.as_ref().clone()])?;
+                    self.check_args_resolved(&[lhs.as_ref().clone()])?;
+                    self.check_args_resolved(&[rhs.as_ref().clone()])?;
                 }
                 ExprVariant::Sequence { lhs, rhs } => {
-                    self.check_args_resolved(&vec![lhs.as_ref().clone()])?;
-                    self.check_args_resolved(&vec![rhs.as_ref().clone()])?;
+                    self.check_args_resolved(&[lhs.as_ref().clone()])?;
+                    self.check_args_resolved(&[rhs.as_ref().clone()])?;
                 }
                 _ => {
                     return Ok(());
