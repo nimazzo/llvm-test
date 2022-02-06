@@ -3,7 +3,7 @@ use crate::core::InternalFunction::{PrintInteger, PrintString};
 use crate::Compiler;
 use inkwell::AddressSpace;
 
-use crate::core::ExternalFuncton::Printf;
+use crate::core::ExternalFunction::Printf;
 use anyhow::Result;
 
 pub enum InternalFunction {
@@ -11,7 +11,7 @@ pub enum InternalFunction {
     PrintInteger,
 }
 
-pub enum ExternalFuncton {
+pub enum ExternalFunction {
     Printf,
 }
 
