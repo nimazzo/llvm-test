@@ -1,7 +1,6 @@
 // todo: prevent user from defining illegal identifiers (e.g. duplicate functions or variable called main)
 // todo: implement escape char in strings (mainly \n)
 // todo: improve compile errors (add context)
-// todo: try to compile all function prototypes first so that they can be called before definition
 // todo: define std in lang source not in rust
 
 extern crate inkwell;
@@ -12,11 +11,10 @@ use crate::program::CompiledProgram;
 use clap::{ErrorKind, IntoApp, Parser, Subcommand};
 use std::error::Error;
 use std::ffi::OsStr;
-use std::fmt::{Arguments, Display};
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use crate::console::Console;
 use crate::error::CompileError;
 use crate::interpreter::Interpreter;
 use crate::typecheck::TypeChecker;
@@ -24,6 +22,7 @@ use anyhow::Result;
 
 mod ast;
 mod compiler;
+mod console;
 mod core;
 mod error;
 mod interpreter;
@@ -34,37 +33,6 @@ mod program;
 mod token;
 mod typecheck;
 mod util;
-
-#[macro_export]
-macro_rules! here {
-    () => {
-        format!("{}:{}:{} ", file!(), line!(), column!())
-    };
-}
-
-macro_rules! start_timer {
-    ($timer: expr, $desc: expr, $time: expr) => {{
-        if $time {
-            $timer.start($desc);
-        }
-    }};
-}
-
-macro_rules! stop_timer {
-    ($timer: expr, $time: expr) => {{
-        if $time {
-            $timer.stop();
-        }
-    }};
-}
-
-macro_rules! display_timer {
-    ($timer: expr, $time: expr) => {{
-        if $time {
-            println!("{}", $timer);
-        }
-    }};
-}
 
 #[derive(clap::Parser)]
 #[clap(name = "Language Compiler", version, about = "Compiles source files")]
@@ -393,76 +361,6 @@ mod subcommand {
         console.println("[Analyzer] Following functions are defined in the program:");
         for fun in program.functions() {
             console.println(fun);
-        }
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Copy, Clone)]
-pub struct Console {
-    quiet: bool,
-    verbose: bool,
-}
-
-#[allow(dead_code)]
-impl Console {
-    fn quiet() -> Self {
-        Self {
-            quiet: true,
-            verbose: false,
-        }
-    }
-    fn normal() -> Self {
-        Self {
-            quiet: false,
-            verbose: false,
-        }
-    }
-    fn verbose() -> Self {
-        Self {
-            quiet: false,
-            verbose: true,
-        }
-    }
-}
-
-impl Write for Console {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if !self.quiet {
-            return Ok(0);
-        }
-        std::io::stdout().write(buf)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        if !self.quiet {
-            return Ok(());
-        }
-        std::io::stdout().flush()
-    }
-
-    fn write_fmt(&mut self, fmt: Arguments<'_>) -> std::io::Result<()> {
-        if !self.quiet {
-            return Ok(());
-        }
-        std::io::stdout().write_fmt(fmt)
-    }
-}
-
-impl Console {
-    fn println(&self, s: impl Display) {
-        if !self.quiet {
-            println!("{}", s);
-        }
-    }
-
-    fn force_println(&self, s: impl Display) {
-        println!("{}", s);
-    }
-
-    fn println_verbose(&self, s: impl Display) {
-        if self.verbose {
-            println!("{}", s);
         }
     }
 }

@@ -1,4 +1,3 @@
-// TODO: Bug with chained function calls and local variables
 use crate::ast::{
     ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, PrototypeAST, AST,
 };
@@ -185,19 +184,6 @@ impl Interpreter {
                 };
                 local_variables.insert(name.to_string(), arg);
             }
-
-            // let mut evaluated_args = vec![];
-            // for evaluated_arg in args
-            //     .iter()
-            //     .map(|expr| self.eval_expr(expr, old_local_variables))
-            // {
-            //     match evaluated_arg {
-            //         ExprResult::Number(_) | ExprResult::String(_) => {
-            //             evaluated_args.push(evaluated_arg);
-            //         }
-            //         _ => panic!("{}", INTERNAL_ERROR),
-            //     }
-            // }
 
             let result = self.eval_expr(&fun.body, &local_variables);
             local_variables.clear();

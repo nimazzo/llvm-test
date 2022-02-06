@@ -120,7 +120,7 @@ fn compile_print_string(compiler: &mut Compiler) -> Result<()> {
         .set_var_args(is_var_args);
 
     let fun = compiler.compile_fn_prototype(public_name, &mut proto)?;
-    compiler.compile_fn(&proto, fun, &body).map(|_| ())
+    compiler.compile_fn_body(&proto, fun, &body).map(|_| ())
 }
 
 fn compile_print_integer(compiler: &mut Compiler) -> Result<()> {
@@ -150,5 +150,5 @@ fn compile_print_integer(compiler: &mut Compiler) -> Result<()> {
         .set_var_args(is_var_args);
 
     let fun = compiler.compile_fn_prototype(public_name, &mut proto)?;
-    compiler.compile_fn(&proto, fun, &body).map(|_| ())
+    compiler.compile_fn_body(&proto, fun, &body).map(|_| ())
 }

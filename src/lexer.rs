@@ -85,9 +85,6 @@ impl Lexer {
     }
 
     pub fn get_token_pos(&self) -> (usize, usize) {
-        // let token_len = self.idx - self.idx_token_start;
-        // (self.row, self.col - token_len)
-        // (self., self.col)
         self.current_token_pos
     }
 

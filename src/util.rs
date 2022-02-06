@@ -51,3 +51,37 @@ pub fn resolve_function_interpreter<'a>(
     }
     None
 }
+
+#[macro_export]
+macro_rules! here {
+    () => {
+        format!("{}:{}:{} ", file!(), line!(), column!())
+    };
+}
+
+#[macro_export]
+macro_rules! start_timer {
+    ($timer: expr, $desc: expr, $time: expr) => {{
+        if $time {
+            $timer.start($desc);
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! stop_timer {
+    ($timer: expr, $time: expr) => {{
+        if $time {
+            $timer.stop();
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! display_timer {
+    ($timer: expr, $time: expr) => {{
+        if $time {
+            println!("{}", $timer);
+        }
+    }};
+}

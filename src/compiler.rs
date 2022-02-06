@@ -75,7 +75,7 @@ impl<'ctx> Compiler<'ctx> {
 
         // compile function bodies
         for (public_name, (fun, proto, body)) in functions {
-            self.compile_fn(&proto, fun, body)?;
+            self.compile_fn_body(&proto, fun, body)?;
 
             let mut function = CompiledFunction::new(public_name, proto.ty.clone());
             proto.args.iter().cloned().for_each(|arg| {
@@ -126,7 +126,6 @@ impl<'ctx> Compiler<'ctx> {
         }
 
         // add function prototype to map of defined functions
-        // todo: maybe this is an error
         self.functions
             .entry(public_name.to_string())
             .or_insert_with(Vec::new)
@@ -156,43 +155,6 @@ impl<'ctx> Compiler<'ctx> {
 
         Ok(())
     }
-
-    // fn compile_fn(&mut self, proto: &PrototypeAST, body: &ExprAST) -> Result<FunctionValue<'ctx>> {
-    //     let function = self.compile_fn_prototype(proto)?;
-    //
-    //     self.alloc_fn_arguments(function, proto)?;
-    //
-    //     // compile function body
-    //     match self.compile_expr(body) {
-    //         Ok(body) => {
-    //             self.builder.build_return(Some(&body));
-    //         }
-    //         Err(e) => {
-    //             if let Some(CompileError {
-    //                 error_type: CompileErrorType::VoidReturn,
-    //                 ..
-    //             }) = e.downcast_ref::<CompileError>()
-    //             {
-    //                 self.builder.build_return(None);
-    //             } else {
-    //                 return Err(e);
-    //             }
-    //         }
-    //     }
-    //
-    //     // reset fn specific fields to default
-    //     self.curr_fn = None;
-    //     self.variables.clear();
-    //
-    //     if function.verify(true) {
-    //         Ok(function)
-    //     } else {
-    //         unsafe {
-    //             function.delete();
-    //         }
-    //         Err(CompileError::generic_compilation_error("Could not build function", here!()).into())
-    //     }
-    // }
 
     pub fn create_entry_block_alloca(
         &self,
@@ -224,41 +186,12 @@ impl<'ctx> Compiler<'ctx> {
         Ok(builder.build_alloca(arg_type, name))
     }
 
-    pub fn compile_fn(
+    pub fn compile_fn_body(
         &mut self,
         proto: &PrototypeAST,
         function: FunctionValue<'ctx>,
         body: &ExprAST,
     ) -> Result<FunctionValue> {
-        // let function = {
-        //     let mut args_types = vec![];
-        //     for (_, arg) in &proto.args {
-        //         if let Ok(bte) = BasicTypeEnum::try_from(self.to_llvm_type(arg)) {
-        //             args_types.push(BasicMetadataTypeEnum::from(bte));
-        //         } else {
-        //             return Err(
-        //                 CompileError::generic_compilation_error("Invalid Type", here!()).into(),
-        //             );
-        //         }
-        //     }
-        //
-        //     let fn_type = if proto.ty == ExprType::Void {
-        //         self.context.void_type().fn_type(&args_types, is_var_args)
-        //     } else if let Ok(bt) = BasicTypeEnum::try_from(self.to_llvm_type(&proto.ty)) {
-        //         bt.fn_type(&args_types, is_var_args)
-        //     } else {
-        //         return Err(
-        //             CompileError::generic_compilation_error("Invalid Type", here!()).into(),
-        //         );
-        //     };
-        //
-        //     self.module.add_function(&proto.name, fn_type, linkage)
-        // };
-        //
-        // // update internal fn name
-        // proto.name =
-        //     unsafe { std::str::from_utf8_unchecked(function.get_name().to_bytes()).to_string() };
-
         // Compile function body
         self.alloc_fn_arguments(function, proto)?;
 
@@ -272,12 +205,6 @@ impl<'ctx> Compiler<'ctx> {
         self.variables.clear();
 
         if function.verify(true) {
-            // self.functions.insert(public_name.to_string(), proto);
-            // todo: maybe this is a bug
-            // self.functions
-            //     .entry(public_name.to_string())
-            //     .or_insert_with(Vec::new)
-            //     .push(proto);
             Ok(function)
         } else {
             unsafe {
@@ -341,7 +268,7 @@ impl<'ctx> Compiler<'ctx> {
                     ExprType::Void => {
                         return None;
                     }
-                    _ => todo!(""),
+                    _ => unreachable!(INTERNAL_ERROR),
                 }
             }
             ExprVariant::BinaryExpr { op, lhs, rhs } => {
