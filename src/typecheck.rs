@@ -142,7 +142,7 @@ impl<'a> TypeChecker<'a> {
         loop {
             let mut unresolved = 0;
             unresolved_functions.iter_mut().for_each(|fun| {
-                self.type_check_function(fun, &mut unresolved);
+                self.resolve_function_type(fun, &mut unresolved);
             });
 
             if unresolved == 0 {
@@ -170,7 +170,9 @@ impl<'a> TypeChecker<'a> {
                             self.check_args_resolved(args)?;
                             let found = args
                                 .iter()
-                                .map(|expr| format!("{:?}", expr.variant.type_of()))
+                                .map(|expr| {
+                                    format!("{:?}", expr.variant.type_of().expect(INTERNAL_ERROR))
+                                })
                                 .collect::<Vec<String>>()
                                 .join(", ");
                             let found = format!("[{}]", found);
@@ -212,20 +214,13 @@ impl<'a> TypeChecker<'a> {
                         }
                     }
                     ExprVariant::Variable { ident, .. } => {
-                        match self.context.variables.get(ident) {
-                            Some(ty) => {
-                                panic!("will this get called?");
-                            }
-                            None => {
-                                return Err(ParseError::unknown_variable(
-                                    self.lexer.get_context(context),
-                                    ident,
-                                    here!(),
-                                )
-                                .with_pos(pos)
-                                .into());
-                            }
-                        }
+                        return Err(ParseError::unknown_variable(
+                            self.lexer.get_context(context),
+                            ident,
+                            here!(),
+                        )
+                        .with_pos(pos)
+                        .into());
                     }
                     _ => {
                         return Err(ParseError::unknown_type(
@@ -347,6 +342,8 @@ impl<'a> TypeChecker<'a> {
             }
             ExprVariant::BinaryExpr { op, lhs, rhs } => match op {
                 BinOp::Add | BinOp::Minus | BinOp::Mul | BinOp::Div => {
+                    self.check_expr_types(lhs)?;
+                    self.check_expr_types(rhs)?;
                     let left_type = lhs.variant.type_of().expect(INTERNAL_ERROR);
                     let right_type = rhs.variant.type_of().expect(INTERNAL_ERROR);
                     if left_type == right_type {
@@ -371,7 +368,7 @@ impl<'a> TypeChecker<'a> {
         }
     }
 
-    fn type_check_function(&mut self, fun: &mut FunctionAST, unresolved: &mut usize) -> bool {
+    fn resolve_function_type(&mut self, fun: &mut FunctionAST, unresolved: &mut usize) -> bool {
         let local_variables = fun
             .proto
             .args

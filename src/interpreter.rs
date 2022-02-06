@@ -149,8 +149,6 @@ impl Interpreter {
         internal: bool,
         old_local_variables: &HashMap<String, ExprAST>,
     ) -> ExprResult {
-        println!("Function call: {} with args: {:#?}", fn_name, args);
-        println!("local variables: {:#?}", old_local_variables);
         if internal {
             match fn_name {
                 "print" => self.eval_print(args, old_local_variables),
