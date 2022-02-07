@@ -86,6 +86,23 @@ fn function_matches_call(proto: &PrototypeAST, args: &[ExprType]) -> bool {
     false
 }
 
+pub fn find_proto(
+    name: &str,
+    ret: &ExprType,
+    args: &[ExprType],
+    prototypes: &[PrototypeAST],
+) -> Option<usize> {
+    for (i, proto) in prototypes.iter().enumerate() {
+        if proto.name == name
+            && proto.ty == *ret
+            && proto.args.iter().map(|(_, t)| t).eq(args.iter())
+        {
+            return Some(i);
+        }
+    }
+    None
+}
+
 #[macro_export]
 macro_rules! here {
     () => {

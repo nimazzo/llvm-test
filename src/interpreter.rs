@@ -1,96 +1,29 @@
-use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, AST};
+use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprVariant, FunctionAST, AST};
 use crate::console::Console;
-use crate::core::{CoreLib, InternalFunction};
+use crate::core::CoreLib;
 use crate::interpreter::ExprResult::Number;
-use crate::util::resolve_function_interpreter;
+use crate::util::{resolve_function_interpreter, INTERNAL_ERROR};
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 pub struct Interpreter {
     functions: HashMap<String, Vec<FunctionAST>>,
     main_function: Option<FunctionAST>,
+    stdout: RefCell<String>,
     console: Console,
 }
-
-const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
 
 impl Interpreter {
     pub fn new(console: Console) -> Self {
         Self {
             functions: HashMap::new(),
             main_function: None,
+            stdout: RefCell::new(String::new()),
             console,
         }
     }
 
-    fn define_internal_functions(&mut self, core_lib: &CoreLib) {
-        let functions = [
-            InternalFunction::PrintString,
-            InternalFunction::PrintInteger,
-        ];
-
-        let internal_definitions = core_lib.get_internal_definitions();
-        // todo: this can easily break if the order of functions in the core.txt file changes
-        for (function, proto) in functions.iter().zip(internal_definitions.into_iter()) {
-            match function {
-                InternalFunction::PrintString => {
-                    // let proto = PrototypeAST::new(
-                    //     "print".to_string(),
-                    //     vec![("s".to_string(), ExprType::String)],
-                    //     ExprType::Integer,
-                    //     (0, 0),
-                    //     (0, 0),
-                    // )
-                    // .set_var_args(true);
-                    let body = ExprAST::new_function_call(
-                        "print".to_string(),
-                        vec![ExprAST::new_variable(
-                            "s".to_string(),
-                            Some(ExprType::String),
-                            (0, 0),
-                            (0, 0),
-                        )],
-                        Some(ExprType::Integer),
-                        (0, 0),
-                        (0, 0),
-                    )
-                    .set_internal();
-                    self.functions
-                        .entry("print".to_string())
-                        .or_insert_with(Vec::new)
-                        .push(FunctionAST::new(proto, body, (0, 0), (0, 0)));
-                }
-                InternalFunction::PrintInteger => {
-                    // let proto = PrototypeAST::new(
-                    //     "print".to_string(),
-                    //     vec![("n".to_string(), ExprType::Integer)],
-                    //     ExprType::Integer,
-                    //     (0, 0),
-                    //     (0, 0),
-                    // )
-                    // .set_var_args(true);
-                    let body = ExprAST::new_function_call(
-                        "print".to_string(),
-                        vec![ExprAST::new_variable(
-                            "n".to_string(),
-                            Some(ExprType::Integer),
-                            (0, 0),
-                            (0, 0),
-                        )],
-                        Some(ExprType::Integer),
-                        (0, 0),
-                        (0, 0),
-                    )
-                    .set_internal();
-                    self.functions
-                        .entry("print".to_string())
-                        .or_insert_with(Vec::new)
-                        .push(FunctionAST::new(proto, body, (0, 0), (0, 0)));
-                }
-            }
-        }
-    }
-
-    pub fn run(&mut self, ast: AST, core_lib: &CoreLib) {
+    pub fn run(&mut self, ast: AST, core_lib: CoreLib) {
         self.define_internal_functions(core_lib);
 
         for node in ast {
@@ -111,37 +44,28 @@ impl Interpreter {
             }
         }
         if let Some(main) = self.main_function.take() {
+            self.console
+                .println("[Interpreter] Interpreting program...\n");
             let result = self.eval_expr(&main.body, &HashMap::new());
+
+            self.stdout
+                .borrow()
+                .lines()
+                .for_each(|line| self.console.force_println(format!("[Program] {}", line)));
+
             self.console.force_println(format!(
-                "[Interpreter] Main function exited with: {:?}",
+                "\n[Interpreter] Main function exited with: {:?}",
                 result
             ));
         } else {
             self.console
-                .force_println("[Interpreter] Warning: Program does not contain main function.");
+                .force_println("\n[Interpreter] Warning: Program does not contain main function.");
         }
     }
 
-    fn eval_print(
-        &self,
-        args: &[ExprAST],
-        local_variables: &HashMap<String, ExprAST>,
-    ) -> ExprResult {
-        let s = args.get(0).expect(INTERNAL_ERROR);
-        let result = self.eval_expr(s, local_variables);
-        match result {
-            ExprResult::Number(n) => {
-                self.console.force_println(format!("[Interpreter] {}", n));
-                ExprResult::Number(n.to_string().len() as i32)
-            }
-            ExprResult::String(s) => {
-                self.console.force_println(format!("[Interpreter] {}", s));
-                ExprResult::Number(s.len() as i32)
-            }
-            _ => {
-                panic!("{}", INTERNAL_ERROR);
-            }
-        }
+    fn define_internal_functions(&mut self, core_lib: CoreLib) {
+        let internal_functions = core_lib.get_core_functions();
+        self.functions.extend(internal_functions.clone());
     }
 
     fn eval_function_call(
@@ -153,11 +77,10 @@ impl Interpreter {
     ) -> ExprResult {
         if internal {
             match fn_name {
-                "print" => self.eval_print(args, old_local_variables),
+                "printf" => self.eval_print(args, old_local_variables),
                 _ => panic!("unknown internal function"),
             }
         } else {
-            // let fun = self.functions.get(fn_name).expect(INTERNAL_ERROR);
             let args = args
                 .iter()
                 .map(|expr| match self.eval_expr(expr, old_local_variables) {
@@ -219,6 +142,28 @@ impl Interpreter {
                 self.eval_expr(rhs, local_variables)
             }
             ExprVariant::Nop => ExprResult::Null,
+        }
+    }
+
+    fn eval_print(
+        &self,
+        args: &[ExprAST],
+        local_variables: &HashMap<String, ExprAST>,
+    ) -> ExprResult {
+        let s = args.get(1).expect(INTERNAL_ERROR);
+        let result = self.eval_expr(s, local_variables);
+        match result {
+            ExprResult::Number(n) => {
+                self.stdout.borrow_mut().push_str(&n.to_string());
+                ExprResult::Number(n.to_string().len() as i32)
+            }
+            ExprResult::String(s) => {
+                self.stdout.borrow_mut().push_str(&s);
+                ExprResult::Number(s.len() as i32)
+            }
+            _ => {
+                panic!("{}", INTERNAL_ERROR);
+            }
         }
     }
 

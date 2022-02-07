@@ -1,8 +1,5 @@
 // todo: prevent user from defining illegal identifiers (e.g. duplicate functions or variable called main)
-// todo: implement escape char in strings (mainly \n)
 // todo: improve compile errors (add context)
-// todo: define std in lang source not in rust
-// todo: check exit code of clang
 
 extern crate inkwell;
 
@@ -164,7 +161,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     if cli.interpret {
         start_timer!(timer, "Interpreter", cli.time);
         let mut interpreter = Interpreter::new(console);
-        interpreter.run(ast, &core_lib);
+        interpreter.run(ast, core_lib);
         stop_timer!(timer, cli.time);
         display_timer!(timer, cli.time);
         return Ok(());
@@ -179,7 +176,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     // Turn AST into LLVM IR
     start_timer!(timer, "LLVM IR Generation", cli.time);
     let mut compiler = Compiler::new()?;
-    let program = compiler.compile(&ast, &core_lib)?;
+    let program = compiler.compile(&ast, core_lib)?;
     stop_timer!(timer, cli.time);
 
     // Option --print-ir
@@ -198,6 +195,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
                 stop_timer!(timer, cli.time);
             }
         }
+        display_timer!(timer, cli.time);
+        return Ok(());
     }
 
     let out_path = create_output_path(&cli)?;
@@ -354,7 +353,7 @@ fn cleanup(out_path: impl AsRef<Path>, console: Console) {
 }
 
 fn run_program(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
-    console.println("[Compiler] Executing compiled program");
+    console.println("[Compiler] Executing compiled program...");
     let exe_path = out_path.as_ref().with_extension("exe");
     let mut cmd = Command::new(&exe_path);
     console.println(format!("[CMD] {:?}\n", cmd));
@@ -365,7 +364,7 @@ fn run_program(out_path: impl AsRef<Path>, console: Console) -> Result<()> {
         )
     })?;
 
-    let program_output = String::from_utf8(output.stdout)?;
+    let program_output = String::from_utf8_lossy(output.stdout.as_slice());
     program_output
         .lines()
         .for_each(|line| console.force_println(format!("[Program] {}", line)));
@@ -389,7 +388,16 @@ mod subcommand {
 
     fn print_functions_(program: &CompiledProgram, console: Console) {
         console.println("[Analyzer] Following functions are defined in the program:");
-        for fun in program.functions() {
+        console.println("\n  =============== Core Functions ===============");
+        for fun in program.core_functions() {
+            console.println(fun);
+        }
+        console.println("\n  =============== User Functions ===============");
+        for fun in program.user_functions() {
+            console.println(fun);
+        }
+        console.println("\n  =============== External Functions ===============");
+        for fun in program.external_functions() {
             console.println(fun);
         }
     }

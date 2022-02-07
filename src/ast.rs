@@ -409,7 +409,7 @@ pub enum BinOp {
     Div,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone)]
 pub enum ExprType {
     Integer,
     String,

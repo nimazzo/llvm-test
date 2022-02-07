@@ -31,20 +31,17 @@ impl CoreLib {
         Ok(core_lib)
     }
 
+    // Pass core functions to Interpreter
+    pub fn get_core_functions(&self) -> &HashMap<String, Vec<FunctionAST>> {
+        &self.core_functions
+    }
+
+    pub fn get_external_functions(&self) -> &HashMap<String, Vec<PrototypeAST>> {
+        &self.external_functions
+    }
+
     // Internal Prototype Definitions
     pub fn get_internal_definitions(&self) -> Vec<PrototypeAST> {
-        // let mut ast = vec![];
-        // let functions = [PrintString, PrintInteger]; // !!!Add new Values here!!!
-        // for function in functions {
-        //     match function {
-        //         PrintString => {
-        //             ast.push(self.get_print_string_definition());
-        //         }
-        //         PrintInteger => {
-        //             ast.push(self.get_print_integer_definition());
-        //         }
-        //     }
-        // }
         let mut ast = vec![];
         for functions in self.core_functions.values() {
             for function in functions {
@@ -55,42 +52,22 @@ impl CoreLib {
     }
 
     // Define external Functions
-    pub fn define_external_functions(&self, compiler: &mut Compiler) -> Result<()> {
-        // let functions = [Printf]; // !!!Add new Values here!!!
-        // for function in functions {
-        //     match function {
-        //         Printf => {
-        //             self.define_printf(compiler)?;
-        //         }
-        //     }
-        // }
-        for functions in self.external_functions.values() {
-            for proto in functions {
-                let mut proto = proto.clone().set_internal(true);
-                compiler.compile_fn_prototype("", &mut proto)?;
+    pub fn define_external_functions(&mut self, compiler: &mut Compiler) -> Result<()> {
+        for functions in self.external_functions.values_mut() {
+            for proto in functions.iter_mut() {
+                compiler.compile_fn_prototype("", proto)?;
             }
         }
         Ok(())
     }
 
     // Compile Internal Functions
-    pub fn compile_internal_functions(&self, compiler: &mut Compiler) -> Result<()> {
-        // let functions = [PrintString, PrintInteger]; // !!!Add new Values here!!!
-        // for function in functions {
-        //     match function {
-        //         PrintString => {
-        //             self.compile_print_string(compiler)?;
-        //         }
-        //         PrintInteger => {
-        //             self.compile_print_integer(compiler)?;
-        //         }
-        //     }
-        // }
-        for (name, functions) in &self.core_functions {
+    pub fn compile_internal_functions(&mut self, compiler: &mut Compiler) -> Result<()> {
+        for (name, functions) in &mut self.core_functions {
             for function in functions {
-                let mut proto = function.proto.clone();
-                let fun = compiler.compile_fn_prototype(name, &mut proto)?;
-                compiler.compile_fn_body(&proto, fun, &function.body)?;
+                let proto = &mut function.proto;
+                let fun = compiler.compile_fn_prototype(name, proto)?;
+                compiler.compile_fn_body(proto, fun, &function.body)?;
             }
         }
         Ok(())
@@ -122,7 +99,7 @@ impl CoreLib {
                     .external_functions
                     .entry(proto.name.clone())
                     .or_insert_with(Vec::new)
-                    .push(proto),
+                    .push(proto.set_internal(true)),
                 ASTPrimitive::Function(fun) => self
                     .core_functions
                     .entry(fun.proto.name.clone())
@@ -170,100 +147,4 @@ impl CoreLib {
             .println_verbose(format!("[Core Lib] AST: {:#?}", ast));
         Ok(ast)
     }
-
-    /*
-    #[allow(dead_code)]
-    fn get_print_string_definition(&self) -> PrototypeAST {
-        PrototypeAST::new(
-            "print".to_string(),
-            vec![("s".to_string(), ExprType::String)],
-            ExprType::Integer,
-            (0, 0),
-            (0, 0),
-        )
-    }
-
-    #[allow(dead_code)]
-    fn get_print_integer_definition(&self) -> PrototypeAST {
-        PrototypeAST::new(
-            "print".to_string(),
-            vec![("n".to_string(), ExprType::Integer)],
-            ExprType::Integer,
-            (0, 0),
-            (0, 0),
-        )
-    }
-
-    #[allow(dead_code)]
-    fn define_printf(&self, compiler: &Compiler) -> Result<()> {
-        let name = "printf";
-        let i8_ptr = compiler
-            .context
-            .i8_type()
-            .ptr_type(AddressSpace::Generic)
-            .into();
-        let fn_type = compiler.context.i32_type().fn_type(&[i8_ptr], true);
-        compiler.module.add_function(name, fn_type, None);
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    fn compile_print_string(&self, compiler: &mut Compiler) -> Result<()> {
-        let internal_name = "__internal_print_string";
-
-        let mut proto = self.get_print_string_definition();
-        let public_name = proto.name.clone();
-        proto.name = internal_name.to_string();
-
-        // compile function body
-        let body = ExprAST::new_function_call(
-            "printf".to_string(),
-            vec![
-                ExprAST::new_string("%s\n".to_string(), (0, 0), (0, 0)),
-                ExprAST::new_variable("s".to_string(), Some(ExprType::String), (0, 0), (0, 0)),
-            ],
-            Some(ExprType::Integer),
-            (0, 0),
-            (0, 0),
-        )
-        .set_internal();
-
-        let fun = compiler.compile_fn_prototype(&public_name, &mut proto)?;
-        compiler.compile_fn_body(&proto, fun, &body).map(|_| ())
-    }
-
-    #[allow(dead_code)]
-    fn compile_print_integer(&self, compiler: &mut Compiler) -> Result<()> {
-        let internal_name = "__internal_print_integer";
-
-        let mut proto = self.get_print_integer_definition();
-        let public_name = proto.name.clone();
-        proto.name = internal_name.to_string();
-
-        // compile function body
-        let body = ExprAST::new_function_call(
-            "printf".to_string(),
-            vec![
-                ExprAST::new_string("%d\n".to_string(), (0, 0), (0, 0)),
-                ExprAST::new_variable("n".to_string(), Some(ExprType::Integer), (0, 0), (0, 0)),
-            ],
-            Some(ExprType::Integer),
-            (0, 0),
-            (0, 0),
-        )
-        .set_internal();
-
-        let fun = compiler.compile_fn_prototype(&public_name, &mut proto)?;
-        compiler.compile_fn_body(&proto, fun, &body).map(|_| ())
-    }
-     */
-}
-
-pub enum InternalFunction {
-    PrintString,
-    PrintInteger,
-}
-
-pub enum ExternalFunction {
-    Printf,
 }

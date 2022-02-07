@@ -1,6 +1,9 @@
 // fn main()
 
 fn main() -> int {
-    print("Hello World");
-    print("How are you?\nFine");
+    print(hello());
+}
+
+fn hello() -> String {
+    "hello";
 }

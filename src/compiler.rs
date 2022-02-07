@@ -48,14 +48,12 @@ impl<'ctx> Compiler<'ctx> {
         })
     }
 
-    pub fn compile(&mut self, ast: &AST, core_lib: &CoreLib) -> Result<CompiledProgram> {
-        let mut program_builder = ProgramBuilder::new();
-
-        // self.debug_declare_print();
+    pub fn compile(&mut self, ast: &AST, mut core_lib: CoreLib) -> Result<CompiledProgram> {
         core_lib.define_external_functions(self)?;
         core_lib.compile_internal_functions(self)?;
 
         let mut functions = HashMap::new();
+
         // compile prototypes
         for node in ast {
             match node {
@@ -78,22 +76,38 @@ impl<'ctx> Compiler<'ctx> {
             }
         }
 
+        let mut program_builder = ProgramBuilder::new();
+
         // compile function bodies
         for (public_name, overloads) in functions {
             for (fun, proto, body) in overloads {
                 self.compile_fn_body(&proto, fun, body)?;
-
-                let mut function = CompiledFunction::new(
-                    public_name.clone(),
-                    proto.name.clone(),
-                    proto.ty.clone(),
-                );
-                proto.args.iter().cloned().for_each(|arg| {
-                    function.add_argument(arg.0, arg.1);
-                });
-                program_builder.add_function(function);
+                let function = CompiledFunction::new(public_name.clone(), &proto);
+                program_builder.add_user_function(function);
             }
         }
+
+        // add core functions to CompiledProgram
+        core_lib
+            .get_core_functions()
+            .iter()
+            .for_each(|(public_name, overloads)| {
+                for fun in overloads {
+                    let function = CompiledFunction::new(public_name.clone(), &fun.proto);
+                    program_builder.add_core_function(function);
+                }
+            });
+
+        // add external functions to CompiledProgram
+        core_lib
+            .get_external_functions()
+            .iter()
+            .for_each(|(public_name, overloads)| {
+                for proto in overloads {
+                    let function = CompiledFunction::new(public_name.clone(), proto);
+                    program_builder.add_external_function(function);
+                }
+            });
 
         let code = self.module.write_bitcode_to_memory();
         program_builder.add_bitcode(code);

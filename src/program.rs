@@ -4,19 +4,29 @@ use inkwell::module::Module;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
-use crate::ast::ExprType;
+use crate::ast::{ExprType, PrototypeAST};
 use crate::error::CompileError;
 use crate::here;
 use anyhow::Result;
 
 pub struct CompiledProgram {
-    functions: Vec<CompiledFunction>,
+    user_functions: Vec<CompiledFunction>,
+    core_functions: Vec<CompiledFunction>,
+    external_functions: Vec<CompiledFunction>,
     bitcode: MemoryBuffer,
 }
 
 impl CompiledProgram {
-    pub fn functions(&self) -> &[CompiledFunction] {
-        &self.functions
+    pub fn user_functions(&self) -> &[CompiledFunction] {
+        &self.user_functions
+    }
+
+    pub fn core_functions(&self) -> &[CompiledFunction] {
+        &self.core_functions
+    }
+
+    pub fn external_functions(&self) -> &[CompiledFunction] {
+        &self.external_functions
     }
 
     pub fn get_llvm_ir(&self) -> Result<String> {
@@ -57,20 +67,34 @@ impl CompiledProgram {
 
 #[derive(Default)]
 pub struct ProgramBuilder {
-    functions: Vec<CompiledFunction>,
+    user_functions: Vec<CompiledFunction>,
+    core_functions: Vec<CompiledFunction>,
+    external_functions: Vec<CompiledFunction>,
     bitcode: Option<MemoryBuffer>,
 }
 
 impl ProgramBuilder {
     pub fn new() -> Self {
         Self {
-            functions: vec![],
+            user_functions: vec![],
+            core_functions: vec![],
+            external_functions: vec![],
             bitcode: None,
         }
     }
 
-    pub fn add_function(&mut self, function: CompiledFunction) -> &Self {
-        self.functions.push(function);
+    pub fn add_user_function(&mut self, function: CompiledFunction) -> &Self {
+        self.user_functions.push(function);
+        self
+    }
+
+    pub fn add_core_function(&mut self, function: CompiledFunction) -> &Self {
+        self.core_functions.push(function);
+        self
+    }
+
+    pub fn add_external_function(&mut self, function: CompiledFunction) -> &Self {
+        self.external_functions.push(function);
         self
     }
 
@@ -84,7 +108,9 @@ impl ProgramBuilder {
             .bitcode
             .ok_or_else(|| CompileError::generic_compilation_error("Missing bitcode", here!()))?;
         Ok(CompiledProgram {
-            functions: self.functions,
+            user_functions: self.user_functions,
+            core_functions: self.core_functions,
+            external_functions: self.external_functions,
             bitcode: buffer,
         })
     }
@@ -122,13 +148,19 @@ impl Display for CompiledFunction {
 }
 
 impl CompiledFunction {
-    pub fn new(name: String, internal_name: String, ty: ExprType) -> Self {
-        Self {
-            public_name: name,
-            internal_name,
+    pub fn new(public_name: String, proto: &PrototypeAST) -> Self {
+        let mut result = Self {
+            public_name,
+            internal_name: proto.name.clone(),
             args: vec![],
-            ty,
-        }
+            ty: proto.ty.clone(),
+        };
+
+        proto.args.iter().cloned().for_each(|arg| {
+            result.add_argument(arg.0, arg.1);
+        });
+
+        result
     }
 
     pub fn add_argument(&mut self, name: String, ty: ExprType) -> &Self {
