@@ -1,6 +1,1 @@
 extern fn printf(format: String, ...) -> int;
-
-fn main() -> int {
-    printf("Hello");
-}
-

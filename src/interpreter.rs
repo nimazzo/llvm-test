@@ -1,6 +1,6 @@
 use crate::ast::{ASTPrimitive, BinOp, ExprAST, ExprType, ExprVariant, FunctionAST, AST};
 use crate::console::Console;
-use crate::core::InternalFunction;
+use crate::core::{CoreLib, InternalFunction};
 use crate::interpreter::ExprResult::Number;
 use crate::util::resolve_function_interpreter;
 use std::collections::HashMap;
@@ -22,14 +22,14 @@ impl Interpreter {
         }
     }
 
-    fn define_internal_functions(&mut self) {
+    fn define_internal_functions(&mut self, core_lib: &CoreLib) {
         let functions = [
             InternalFunction::PrintString,
             InternalFunction::PrintInteger,
         ];
 
-        let internal_definitions = crate::core::get_internal_definitions();
-
+        let internal_definitions = core_lib.get_internal_definitions();
+        // todo: this can easily break if the order of functions in the core.txt file changes
         for (function, proto) in functions.iter().zip(internal_definitions.into_iter()) {
             match function {
                 InternalFunction::PrintString => {
@@ -90,8 +90,8 @@ impl Interpreter {
         }
     }
 
-    pub fn run(&mut self, ast: AST) {
-        self.define_internal_functions();
+    pub fn run(&mut self, ast: AST, core_lib: &CoreLib) {
+        self.define_internal_functions(core_lib);
 
         for node in ast {
             match node {

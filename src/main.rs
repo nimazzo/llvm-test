@@ -15,6 +15,7 @@ use std::process::Command;
 use anyhow::Result;
 use llvm_test::compiler::Compiler;
 use llvm_test::console::Console;
+use llvm_test::core::CoreLib;
 use llvm_test::error::CompileError;
 use llvm_test::interpreter::Interpreter;
 use llvm_test::lexer::Lexer;
@@ -134,6 +135,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
             .exit();
     }
 
+    // create core lib
+    let core_lib = CoreLib::new("./sources/std/", console)?;
+
     // Read Source File
     let input = std::fs::read_to_string(&cli.source)?;
 
@@ -147,7 +151,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     // AST Type Checking
     start_timer!(timer, "Type Checker", cli.time);
     let mut type_checker = TypeChecker::new(console, &lexer);
-    type_checker.run(&mut ast)?;
+    type_checker.run(&mut ast, true, &core_lib)?;
     stop_timer!(timer, cli.time);
 
     // Option --print-ast
@@ -160,7 +164,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     if cli.interpret {
         start_timer!(timer, "Interpreter", cli.time);
         let mut interpreter = Interpreter::new(console);
-        interpreter.run(ast);
+        interpreter.run(ast, &core_lib);
         stop_timer!(timer, cli.time);
         display_timer!(timer, cli.time);
         return Ok(());
@@ -175,7 +179,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     // Turn AST into LLVM IR
     start_timer!(timer, "LLVM IR Generation", cli.time);
     let mut compiler = Compiler::new()?;
-    let program = compiler.compile(&ast)?;
+    let program = compiler.compile(&ast, &core_lib)?;
     stop_timer!(timer, cli.time);
 
     // Option --print-ir

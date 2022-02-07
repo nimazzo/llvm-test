@@ -3,6 +3,7 @@ use crate::ast::{
     AST,
 };
 use crate::console::Console;
+use crate::core::CoreLib;
 use crate::error::ParseError;
 use crate::here;
 use crate::lexer::Lexer;
@@ -27,16 +28,21 @@ impl<'a> TypeChecker<'a> {
         }
     }
 
-    pub fn run(&mut self, ast: &mut AST, requires_main: bool) -> Result<()> {
-        self.resolve_types(ast, requires_main)?;
+    pub fn run(&mut self, ast: &mut AST, requires_main: bool, core_lib: &CoreLib) -> Result<()> {
+        self.resolve_types(ast, requires_main, core_lib)?;
         self.assert_all_types_resolved(ast)?;
         self.check_types(ast)
     }
 
-    fn resolve_types(&mut self, ast: &mut AST, requires_main: bool) -> Result<()> {
+    fn resolve_types(
+        &mut self,
+        ast: &mut AST,
+        requires_main: bool,
+        core_lib: &CoreLib,
+    ) -> Result<()> {
         self.console
             .println("[Type Checker] Starting Type Resolution Process");
-        let internal_defs = crate::core::get_internal_definitions();
+        let internal_defs = core_lib.get_internal_definitions();
 
         let mut functions = HashMap::new();
         internal_defs.iter().for_each(|proto| {
@@ -153,7 +159,7 @@ impl<'a> TypeChecker<'a> {
                 .iter()
                 .fold(0, |acc, (_, funs)| acc + funs.len()),
         ));
-        println!("functions: {:#?}", self.context.functions);
+
         let mut last_unresolved = 0;
         let mut round = 1;
         loop {

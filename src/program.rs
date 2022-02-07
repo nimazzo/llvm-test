@@ -55,6 +55,7 @@ impl CompiledProgram {
     }
 }
 
+#[derive(Default)]
 pub struct ProgramBuilder {
     functions: Vec<CompiledFunction>,
     bitcode: Option<MemoryBuffer>,

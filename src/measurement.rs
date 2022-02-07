@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::time::Instant;
 
+#[derive(Default)]
 pub struct Timer {
     start: Option<Instant>,
     measurements: Vec<Measurement>,

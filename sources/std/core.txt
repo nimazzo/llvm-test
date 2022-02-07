@@ -1,0 +1,7 @@
+fn print(s: String) -> int {
+    printf("%s\n", s);
+}
+
+fn print(n: int) -> int {
+    printf("%d\n", n);
+}

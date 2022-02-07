@@ -1,4 +1,4 @@
-use crate::ast::{ExprType, FunctionAST, PrototypeAST};
+use crate::ast::{ExprAST, ExprType, ExprVariant, FunctionAST, PrototypeAST};
 use std::collections::HashMap;
 
 pub const INTERNAL_ERROR: &str = "[CRITICAL ERROR] Internal Compiler Error";
@@ -23,6 +23,32 @@ pub fn resolve_function<'a>(
     }
     // println!("DEBUG: NOT FOUND");
     None
+}
+
+pub fn mark_function_call_internal(name: &str, proto: &mut ExprAST) {
+    match proto.variant {
+        ExprVariant::FunctionCall {
+            ref mut internal, ..
+        } => {
+            *internal = true;
+        }
+        ExprVariant::BinaryExpr {
+            ref mut lhs,
+            ref mut rhs,
+            ..
+        } => {
+            mark_function_call_internal(name, lhs.as_mut());
+            mark_function_call_internal(name, rhs.as_mut());
+        }
+        ExprVariant::Sequence {
+            ref mut lhs,
+            ref mut rhs,
+        } => {
+            mark_function_call_internal(name, lhs.as_mut());
+            mark_function_call_internal(name, rhs.as_mut());
+        }
+        _ => {}
+    }
 }
 
 pub fn resolve_function_interpreter<'a>(

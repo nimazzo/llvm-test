@@ -9,6 +9,7 @@ use inkwell::values::{
 use std::collections::HashMap;
 use std::error::Error;
 
+use crate::core::CoreLib;
 use crate::error::CompileError;
 use crate::here;
 use crate::program::{CompiledFunction, CompiledProgram, ProgramBuilder};
@@ -47,12 +48,12 @@ impl<'ctx> Compiler<'ctx> {
         })
     }
 
-    pub fn compile(&mut self, ast: &AST) -> Result<CompiledProgram> {
+    pub fn compile(&mut self, ast: &AST, core_lib: &CoreLib) -> Result<CompiledProgram> {
         let mut program_builder = ProgramBuilder::new();
 
         // self.debug_declare_print();
-        crate::core::define_external_functions(self)?;
-        crate::core::compile_internal_functions(self)?;
+        core_lib.define_external_functions(self)?;
+        core_lib.compile_internal_functions(self)?;
 
         let mut functions = HashMap::new();
         // compile prototypes
@@ -136,10 +137,12 @@ impl<'ctx> Compiler<'ctx> {
         }
 
         // add function prototype to map of defined functions
-        self.functions
-            .entry(public_name.to_string())
-            .or_insert_with(Vec::new)
-            .push(proto.clone());
+        if !proto.internal {
+            self.functions
+                .entry(public_name.to_string())
+                .or_insert_with(Vec::new)
+                .push(proto.clone());
+        }
         Ok(fn_val)
     }
 
@@ -378,7 +381,7 @@ impl<'ctx> Compiler<'ctx> {
         BasicValueEnum::from(pp)
     }
 
-    fn to_llvm_type(&self, ty: &ExprType) -> AnyTypeEnum<'ctx> {
+    pub fn to_llvm_type(&self, ty: &ExprType) -> AnyTypeEnum<'ctx> {
         match ty {
             ExprType::I8 => AnyTypeEnum::from(self.context.i8_type()),
             ExprType::I32 => AnyTypeEnum::from(self.context.i32_type()),

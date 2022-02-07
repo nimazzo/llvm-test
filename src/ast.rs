@@ -101,6 +101,7 @@ pub struct PrototypeAST {
     pub name: String,
     pub args: Vec<(String, ExprType)>,
     pub is_var_args: bool,
+    pub internal: bool,
     pub linkage: Option<Linkage>,
     pub ty: ExprType,
     pub context: (usize, usize),
@@ -119,6 +120,7 @@ impl PrototypeAST {
             name,
             args,
             is_var_args: false,
+            internal: false,
             linkage: None,
             ty,
             context,
@@ -128,6 +130,11 @@ impl PrototypeAST {
 
     pub fn with_linkage(mut self, linkage: Option<Linkage>) -> Self {
         self.linkage = linkage;
+        self
+    }
+
+    pub fn set_internal(mut self, internal: bool) -> Self {
+        self.internal = internal;
         self
     }
 
@@ -424,12 +431,12 @@ impl Debug for ExprType {
 }
 
 impl ExprType {
-    pub fn from(value: &str) -> Result<Self, ()> {
+    pub fn from(value: &str) -> Result<Self, &'static str> {
         match value {
             "String" => Ok(ExprType::String),
             "int" => Ok(ExprType::Integer),
             "void" => Ok(ExprType::Void),
-            _ => Err(()),
+            _ => Err("Could not parse ExprType"),
         }
     }
 
@@ -446,6 +453,7 @@ impl ExprType {
     }
 }
 
+#[derive(Default)]
 pub struct TypeContext {
     pub functions: HashMap<String, Vec<PrototypeAST>>,
     pub variables: HashMap<String, ExprType>,

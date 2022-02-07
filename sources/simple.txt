@@ -1,15 +1,6 @@
 // fn main()
 
 fn main() -> int {
-   hello();
-   hello(23);
-   42;
-}
-
-fn hello() -> int {
-    print("Hello with no param");
-}
-
-fn hello(i: int) -> int {
-    print("Hello with int param");
+    print("Hello, World");
+    print("42 + 27 =");
 }
