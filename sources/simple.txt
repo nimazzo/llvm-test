@@ -1,6 +1,6 @@
 // fn main()
 
 fn main() -> int {
-    print("Hello, World");
-    print("42 + 27 =");
+    print("Hello World");
+    print("How are you?\nFine");
 }

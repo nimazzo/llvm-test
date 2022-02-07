@@ -107,6 +107,13 @@ impl Lexer {
                         return Token::TripleDot;
                     }
                 }
+                '\\' => {
+                    self.advance_index();
+                    if let Some(c) = self.peek(0) {
+                        self.advance_index();
+                        return Token::EscapedChar(c);
+                    }
+                }
                 '"' => {
                     self.advance_index();
                     return Token::DoubleQuotes;

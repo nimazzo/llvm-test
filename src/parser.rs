@@ -415,6 +415,23 @@ impl<'a> Parser<'a> {
         loop {
             match &self.current_token {
                 Token::DoubleQuotes => break,
+                Token::EscapedChar(c) => {
+                    if *c == 'n' {
+                        result.push('\n');
+                    } else {
+                        let context = self.lexer.get_token_idx();
+                        let context = (context.0, context.1 + 1);
+                        let context = optionize(context);
+                        let pos = self.lexer.get_token_pos();
+                        return Err(ParseError::missing_token(
+                            self.lexer.get_context(context),
+                            "Escape Character (one of: 'n')",
+                            here!(),
+                        )
+                        .with_pos(pos)
+                        .into());
+                    }
+                }
                 Token::Eof => {
                     return Err(ParseError::unexpected_eof(
                         self.lexer.get_context((Some(start), None)),
