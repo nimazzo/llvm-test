@@ -1,6 +1,7 @@
 // fn main()
 
 fn main() -> int {
+    print("Correct");
     print(hello());
 }
 

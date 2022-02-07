@@ -387,7 +387,12 @@ impl<'ctx> Compiler<'ctx> {
 
     fn compile_string(&self, string: &str) -> BasicValueEnum<'ctx> {
         let string = self.context.const_string(string.as_bytes(), true);
-        let ptr = self.builder.build_alloca(string.get_type(), "alloc_string");
+        // let ptr = self.builder.build_alloca(string.get_type(), "alloc_string");
+        let ptr = self
+            .builder
+            .build_malloc(string.get_type(), "malloc_string")
+            .expect(INTERNAL_ERROR);
+
         self.builder.build_store(ptr, string);
 
         let zero = self.context.i8_type().const_zero();
