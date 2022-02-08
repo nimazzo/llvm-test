@@ -8,3 +8,5 @@ fn main() -> int {
 fn hello() -> String {
     "hello";
 }
+
+2 + 2;
