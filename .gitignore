@@ -21,3 +21,4 @@ Cargo.lock
 *.iws
 out/
 .idea_modules/
+.cargo/
