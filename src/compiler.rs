@@ -208,7 +208,7 @@ impl<'ctx> Compiler<'ctx> {
                 BasicTypeEnum::from(self.context.i8_type().ptr_type(AddressSpace::Generic))
             }
             ExprType::Integer => BasicTypeEnum::from(self.context.i32_type()),
-            _ => unreachable!(INTERNAL_ERROR),
+            _ => unreachable!("{}", INTERNAL_ERROR),
         };
         Ok(builder.build_alloca(arg_type, name))
     }
@@ -296,7 +296,7 @@ impl<'ctx> Compiler<'ctx> {
                     ExprType::Void => {
                         return None;
                     }
-                    _ => unreachable!(INTERNAL_ERROR),
+                    _ => unreachable!("{}", INTERNAL_ERROR),
                 }
             }
             ExprVariant::BinaryExpr { op, lhs, rhs } => {
