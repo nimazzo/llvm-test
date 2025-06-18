@@ -155,11 +155,13 @@ impl Interpreter {
         match result {
             ExprResult::Number(n) => {
                 self.stdout.borrow_mut().push_str(&n.to_string());
-                ExprResult::Number(n.to_string().len() as i32)
+                self.stdout.borrow_mut().push('\n');
+                ExprResult::Number(n.to_string().len() as i32 + 1)
             }
             ExprResult::String(s) => {
                 self.stdout.borrow_mut().push_str(&s);
-                ExprResult::Number(s.len() as i32)
+                self.stdout.borrow_mut().push('\n');
+                ExprResult::Number(s.len() as i32 + 1)
             }
             _ => {
                 panic!("{}", INTERNAL_ERROR);
