@@ -3,6 +3,7 @@
 fn main() -> int {
     print("Correct");
     print(hello());
+    0;
 }
 
 fn hello() -> String {
