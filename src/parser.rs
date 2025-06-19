@@ -8,8 +8,6 @@ use crate::lexer::Lexer;
 use crate::util::optionize;
 use anyhow::Result;
 
-const ANONYMOUS_FUNCTION_NAME: &str = "anonymous";
-
 macro_rules! parse {
     ($self: ident, $tk: path) => {{
         skip_whitespace_and_comments!($self);
@@ -291,53 +289,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_top_level_expression(&mut self) -> Result<FunctionAST> {
-        let context = optionize(self.lexer.get_token_idx());
         let pos = self.lexer.get_token_pos();
-        return Err(ParseError::missing_token(
+        Err(ParseError::missing_token(
             self.lexer.get_context((None, None)),
             "Function Definition or Extern Definition",
             here!(),
         )
         .with_pos(pos)
-        .into());
-        // skip_whitespace_and_comments!(self);
-        // self.console
-        //     .println_verbose("[Parser] Trying to parse top level expression");
-        //
-        // let (context_start, _) = self.lexer.get_token_idx();
-        // let pos = self.lexer.get_token_pos();
-        // let mut expressions = vec![];
-        // loop {
-        //     let body = self.parse_expression()?;
-        //     if body.variant.requires_semicolon() {
-        //         parse!(self, Token::Semicolon)?;
-        //     }
-        //     expressions.push(body);
-        //     match peek!(self) {
-        //         Token::Eof | Token::Fn => break,
-        //         _ => {}
-        //     }
-        // }
-        // let (_, context_end) = self.lexer.get_token_idx();
-        // expressions.push(ExprAST::new_nop((0, 0), (0, 0)));
-        //
-        // let body = self.parse_sequence(expressions)?;
-        //
-        // let proto = PrototypeAST::new(
-        //     ANONYMOUS_FUNCTION_NAME.into(),
-        //     vec![],
-        //     ExprType::Void,
-        //     (0, 0),
-        //     (0, 0),
-        // );
-        // self.console
-        //     .println_verbose("[Parser] Successfully parsed top level expression");
-        // Ok(FunctionAST::new(
-        //     proto,
-        //     body,
-        //     (context_start, context_end),
-        //     pos,
-        // ))
+        .into())
     }
 
     fn parse_expression(&mut self) -> Result<ExprAST> {
@@ -359,13 +318,13 @@ impl<'a> Parser<'a> {
             .with_pos(self.lexer.get_token_pos())
             .into()),
             token => {
-                return Err(ParseError::no_primary_expression(
+                Err(ParseError::no_primary_expression(
                     self.lexer.get_context((None, None)),
                     format!("{}", token),
                     here!(),
                 )
                 .with_pos(self.lexer.get_token_pos())
-                .into());
+                .into())
             }
         }
     }

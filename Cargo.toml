@@ -6,9 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-inkwell = { version = "0.1.0-beta.4", features = ["llvm13-0"] }
+inkwell = { version = "0.6.0", features = ["llvm13-0"] }
 ansi_term = "0.12"
 anyhow = "1"
-thiserror = "1"
-clap = { version = "3", features = ["derive"] }
-backtrace = "0.3"
+thiserror = "2"
+clap = { version = "4.5.40", features = ["derive"] }

@@ -4,7 +4,7 @@ use inkwell::context::Context;
 use inkwell::execution_engine::ExecutionEngine;
 use inkwell::module::Module;
 use inkwell::values::{
-    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue,
+    BasicMetadataValueEnum, BasicValueEnum, FunctionValue, PointerValue,
 };
 use std::collections::HashMap;
 use std::error::Error;
@@ -176,7 +176,7 @@ impl<'ctx> Compiler<'ctx> {
             let (arg_name, arg_type) = &proto.args[i];
             let alloca = self.create_entry_block_alloca(arg_name, arg_type)?;
 
-            self.builder.build_store(alloca, arg);
+            self.builder.build_store(alloca, arg).expect(INTERNAL_ERROR);
             self.variables.insert(arg_name.clone(), alloca);
         }
 
@@ -205,12 +205,12 @@ impl<'ctx> Compiler<'ctx> {
 
         let arg_type = match arg_type {
             ExprType::String => {
-                BasicTypeEnum::from(self.context.i8_type().ptr_type(AddressSpace::Generic))
+                BasicTypeEnum::from(self.context.i8_type().ptr_type(AddressSpace::default()))
             }
             ExprType::Integer => BasicTypeEnum::from(self.context.i32_type()),
             _ => unreachable!("{}", INTERNAL_ERROR),
         };
-        Ok(builder.build_alloca(arg_type, name))
+        Ok(builder.build_alloca(arg_type, name)?)
     }
 
     pub fn compile_fn_body(
@@ -225,7 +225,7 @@ impl<'ctx> Compiler<'ctx> {
         match self.compile_expr(body) {
             Some(bev) => self.builder.build_return(Some(&bev)),
             None => self.builder.build_return(None),
-        };
+        }.expect(INTERNAL_ERROR);
 
         // reset fn specific fields to default
         self.curr_fn = None;
@@ -251,7 +251,7 @@ impl<'ctx> Compiler<'ctx> {
             ExprVariant::String(s) => self.compile_string(s),
             ExprVariant::Variable { ident, .. } => {
                 let ptr = self.variables.get(ident).expect(INTERNAL_ERROR);
-                self.builder.build_load(*ptr, ident)
+                self.builder.build_load(*ptr, ident).expect(INTERNAL_ERROR)
             }
             ExprVariant::FunctionCall {
                 fn_name,
@@ -283,7 +283,8 @@ impl<'ctx> Compiler<'ctx> {
                 let argsv = self.compile_call_args(args);
 
                 // Build function call
-                let call = self.builder.build_call(fun, &argsv, "tmp");
+                let call = self.builder.build_call(fun, &argsv, "tmp")
+                    .expect(INTERNAL_ERROR);
                 match ret_type {
                     ExprType::String => call
                         .try_as_basic_value()
@@ -327,7 +328,7 @@ impl<'ctx> Compiler<'ctx> {
     ) -> BasicValueEnum<'ctx> {
         match (lhs, rhs) {
             (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
-                self.builder.build_int_add(v1, v2, "tmpadd").into()
+                self.builder.build_int_add(v1, v2, "tmpadd").expect(INTERNAL_ERROR).into()
             }
             _ => panic!("[CRITICAL ERROR] Internal Compiler Error"),
         }
@@ -340,7 +341,7 @@ impl<'ctx> Compiler<'ctx> {
     ) -> BasicValueEnum<'ctx> {
         match (lhs, rhs) {
             (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
-                self.builder.build_int_sub(v1, v2, "tmpsub").into()
+                self.builder.build_int_sub(v1, v2, "tmpsub").expect(INTERNAL_ERROR).into()
             }
             _ => panic!("[CRITICAL ERROR] Internal Compiler Error"),
         }
@@ -353,7 +354,7 @@ impl<'ctx> Compiler<'ctx> {
     ) -> BasicValueEnum<'ctx> {
         match (lhs, rhs) {
             (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
-                self.builder.build_int_mul(v1, v2, "tmpsub").into()
+                self.builder.build_int_mul(v1, v2, "tmpsub").expect(INTERNAL_ERROR).into()
             }
             _ => panic!("[CRITICAL ERROR] Internal Compiler Error"),
         }
@@ -366,7 +367,7 @@ impl<'ctx> Compiler<'ctx> {
     ) -> BasicValueEnum<'ctx> {
         match (lhs, rhs) {
             (BasicValueEnum::IntValue(v1), BasicValueEnum::IntValue(v2)) => {
-                self.builder.build_int_signed_div(v1, v2, "tmpsub").into()
+                self.builder.build_int_signed_div(v1, v2, "tmpsub").expect(INTERNAL_ERROR).into()
             }
             _ => panic!("[CRITICAL ERROR] Internal Compiler Error"),
         }
@@ -392,10 +393,10 @@ impl<'ctx> Compiler<'ctx> {
             .build_malloc(string.get_type(), "malloc_string")
             .expect(INTERNAL_ERROR);
 
-        self.builder.build_store(ptr, string);
+        self.builder.build_store(ptr, string).expect(INTERNAL_ERROR);
 
         let zero = self.context.i8_type().const_zero();
-        let pp = unsafe { self.builder.build_gep(ptr, &[zero, zero], "gep") };
+        let pp = unsafe { self.builder.build_gep(ptr, &[zero, zero], "gep").expect(INTERNAL_ERROR) };
         BasicValueEnum::from(pp)
     }
 
@@ -416,7 +417,7 @@ impl<'ctx> Compiler<'ctx> {
             ExprType::Integer => self.to_llvm_type(&ExprType::I32),
             ExprType::String => self.to_llvm_type(&ExprType::Ptr {
                 inner_type: Box::new(ExprType::I8),
-                address_space: AddressSpace::Generic,
+                address_space: AddressSpace::default(),
             }),
             ExprType::Void => AnyTypeEnum::from(self.context.void_type()),
         }

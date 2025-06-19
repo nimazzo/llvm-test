@@ -85,12 +85,12 @@ impl Timer {
 impl Timer {
     fn format_description(&self, desc: &'static str) -> String {
         let str_len = desc.len();
-        return if str_len > self.formats.max_desc_len {
+        if str_len > self.formats.max_desc_len {
             format!("{}..", &desc[..self.formats.max_desc_len - 2])
         } else {
             let buffer = self.formats.max_desc_len - str_len;
             format!(" {}{} ", desc, " ".repeat(buffer))
-        };
+        }
     }
 
     fn format_secs(&self, secs: f64) -> String {

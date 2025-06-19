@@ -1,12 +1,13 @@
 extern crate inkwell;
 
-use clap::{ErrorKind, IntoApp, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::Result;
+use clap::error::ErrorKind;
 use llvm_test::compiler::Compiler;
 use llvm_test::console::Console;
 use llvm_test::core::CoreLib;
@@ -18,14 +19,14 @@ use llvm_test::typecheck::TypeChecker;
 use llvm_test::{display_timer, here, measurement, parser, start_timer, stop_timer};
 
 #[derive(clap::Parser)]
-#[clap(name = "Language Compiler", version, about = "Compiles source files")]
+#[clap(name = "Language Compiler", version, about = "Compiles source files", color = clap::ColorChoice::Always)]
 struct Cli {
     #[clap(
         short,
         long,
         help = "Runs the program after successful compilation",
-        conflicts_with("interpret"),
-        conflicts_with("parse-only")
+        conflicts_with = "interpret",
+        conflicts_with = "parse_only"
     )]
     run: bool,
 
@@ -33,19 +34,19 @@ struct Cli {
         short,
         long,
         help = "Disables all compiler output",
-        conflicts_with("verbose")
+        conflicts_with = "verbose"
     )]
     quiet: bool,
 
-    #[clap(short, long, help = "Show verbose output", conflicts_with("quiet"))]
+    #[clap(short, long, help = "Show verbose output", conflicts_with = "quiet")]
     verbose: bool,
 
     #[clap(
         long,
         help = "Only parse source file, don't compile to native code",
-        conflicts_with("run"),
-        conflicts_with("out"),
-        conflicts_with("print-ir")
+        conflicts_with = "run",
+        conflicts_with = "out",
+        conflicts_with = "print_ir"
     )]
     parse_only: bool,
 
@@ -53,8 +54,8 @@ struct Cli {
         short,
         long,
         help = "Interprets the program without compiling",
-        conflicts_with("run"),
-        conflicts_with("print-ir")
+        conflicts_with = "run",
+        conflicts_with = "print_ir"
     )]
     interpret: bool,
 
@@ -64,8 +65,8 @@ struct Cli {
     #[clap(
         long,
         help = "Print the LLVM IR code",
-        conflicts_with("interpret"),
-        conflicts_with("parse-only")
+        conflicts_with = "interpret",
+        conflicts_with = "parse_only"
     )]
     print_ir: bool,
 
@@ -79,7 +80,7 @@ struct Cli {
         short,
         long,
         help = "Output path for generated files",
-        conflicts_with("parse-only")
+        conflicts_with = "parse_only"
     )]
     out: Option<PathBuf>,
 
@@ -106,7 +107,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     };
     let mut timer = measurement::Timer::new();
 
-    let mut err_app = Cli::into_app();
+    let mut err_app = Cli::command();
     err_app.set_bin_name(
         std::env::args()
             .next()
