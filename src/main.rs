@@ -228,6 +228,9 @@ fn create_output_path(cli: &Cli) -> Result<PathBuf, Box<dyn Error>> {
                 CompileError::generic_compilation_error("Invalid output path", here!())
             })?);
             if let Some(parent) = parent_path {
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent)?;
+                }
                 Ok(parent.join(file_name))
             } else {
                 Ok(file_name)
