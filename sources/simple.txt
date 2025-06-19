@@ -3,9 +3,25 @@
 fn main() -> int {
     print("Correct");
     print(hello());
+    foo();
+    print("Dividing 10 by 3 gives:");
+    print(divide(10, 3));
     0;
 }
 
 fn hello() -> String {
     "hello";
+}
+
+fn foo() -> void {
+    print("foo");
+    nop();
+}
+
+fn nop() -> void {
+
+}
+
+fn divide(a: int, b: int) -> int {
+    a / b;
 }

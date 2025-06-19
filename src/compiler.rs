@@ -311,7 +311,7 @@ impl<'ctx> Compiler<'ctx> {
                 }
             }
             ExprVariant::Sequence { lhs, rhs } => {
-                self.compile_expr(lhs)?;
+                self.compile_expr(lhs);
                 self.compile_expr(rhs)?
             }
             ExprVariant::Nop => {
