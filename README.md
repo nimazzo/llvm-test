@@ -30,10 +30,10 @@ $ cd llvm-test
 ```
 
 ### Set up Environment Variables
-`llvm-sys` needs to be able to find the local LLVM installation. It should normally be able to find it automatically, if `LLVM/bin` is in your `PATH`, but you may also have to set the `LLVM_SYS_130_PREFIX` variable to point to the LLVM installation directory.
+`llvm-sys` needs to be able to find the local LLVM installation. It should normally be able to find it automatically, if `LLVM/bin` is in your `PATH`. If you have multiple local LLVM versions installed, you have to manually set the `LLVM_SYS_130_PREFIX` environment variable to point to the correct LLVM installation directory.
 
 + Make sure `LLVM/bin` is in your `PATH`.
-+ `LLVM_SYS_130_PREFIX`: Path to the LLVM 13 installation directory.
++ `LLVM_SYS_130_PREFIX`: Path to the LLVM 13 installation directory (if using multiple LLVM versions).
 
 ## Usage
 
